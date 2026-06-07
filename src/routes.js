@@ -60,7 +60,7 @@ module.exports = (app, utils) => {
 
         return res.sendFile(media.path)
       }
-      return res.sendStatus(404)
+      return res.sendStatus(mediaFailureStatus(media.reason))
     }
 
     if(req.url.startsWith('/static/images/project-logos/') || req.url === '/static/images/mobile/copyright/wikipedia.png' || req.url === '/static/apple-touch/wikipedia.png') {
@@ -92,6 +92,21 @@ module.exports = (app, utils) => {
 
     return next()
   })
+
+  function mediaFailureStatus(reason) {
+    switch (reason) {
+      case 'INVALID_MEDIA_PATH':
+      case 'INVALID_MEDIA_URL':
+        return 404
+      case 'MKDIR_FAILED':
+      case 'STAT_FAILED':
+        return 500
+      case 'SAVEFILE_EMPTY':
+      case 'SAVEFILE_ERROR':
+      default:
+        return 502
+    }
+  }
 
   function md5HashParts(fileName) {
     const normalized = fileName.replace(/ /g, '_')
@@ -159,7 +174,7 @@ module.exports = (app, utils) => {
       let filename = `${req.params.page}.pdf`
       return res.download(media.path, filename)
     }
-    return res.sendStatus(404)
+    return res.sendStatus(mediaFailureStatus(media.reason))
   })
 
   // handle chinese variants
