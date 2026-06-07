@@ -36,4 +36,11 @@ describe('GET /health', () => {
       expect(res.body.length || res.text.length).toBeGreaterThan(0);
     }
   });
+
+  it('serves /static-prefixed bundled files directly', async () => {
+    const res = await request(app).get('/static/images/mobile/copyright/wikipedia-wordmark-en.svg');
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toMatch(/image\/svg\+xml/);
+    expect((res.text || res.body.toString())).toContain('<svg');
+  });
 });
