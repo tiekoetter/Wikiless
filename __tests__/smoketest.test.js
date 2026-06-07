@@ -19,4 +19,21 @@ describe('GET /health', () => {
     const res = await request(app).get('/health');
     expect(res.statusCode).toBe(200);
   });
+
+  it('serves bundled Wikipedia skin and badge assets', async () => {
+    const paths = [
+      '/static/images/mobile/copyright/wikipedia-wordmark-en.svg',
+      '/w/skins/Vector/resources/common/images/external-link-ltr-icon.svg?48e54',
+      '/w/extensions/WikimediaBadges/resources/images/badge-golden-star.png?ed948',
+      '/w/extensions/WikimediaBadges/resources/images/badge-silver-star.png?70a8c',
+      '/static/images/footer/wikimedia-button.svg',
+      '/w/resources/assets/poweredby_mediawiki.svg',
+    ];
+
+    for(const assetPath of paths) {
+      const res = await request(app).get(assetPath);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.length || res.text.length).toBeGreaterThan(0);
+    }
+  });
 });

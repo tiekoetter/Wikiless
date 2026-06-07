@@ -84,6 +84,12 @@ describe('Routes wiring', () => {
     expect(utils.wikilessLogo).toHaveBeenCalled();
   });
 
+  it('GET Wikimedia footer button -> sendFile bundled asset', async () => {
+    const res = await request(app).get('/static/images/footer/wikimedia-button.svg');
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/SENDFILE:.*wikimedia-button\.svg$/);
+  });
+
   it('GET custom language copyright logo -> sendFile custom logo', async () => {
     utils.customLogos.mockReturnValueOnce('CUSTOM_LOGO_PATH');
     const res = await request(app).get('/static/images/mobile/copyright/wikipedia-wordmark-fr.svg');
@@ -92,6 +98,17 @@ describe('Routes wiring', () => {
     expect(utils.customLogos).toHaveBeenCalledWith(
       '/static/images/mobile/copyright/wikipedia-wordmark-fr.svg',
       'fr'
+    );
+  });
+
+  it('GET English copyright wordmark -> sendFile custom logo', async () => {
+    utils.customLogos.mockReturnValueOnce('EN_WORDMARK_PATH');
+    const res = await request(app).get('/static/images/mobile/copyright/wikipedia-wordmark-en.svg');
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('SENDFILE:EN_WORDMARK_PATH');
+    expect(utils.customLogos).toHaveBeenCalledWith(
+      '/static/images/mobile/copyright/wikipedia-wordmark-en.svg',
+      'en'
     );
   });
 
