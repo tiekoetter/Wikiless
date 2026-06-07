@@ -52,6 +52,24 @@ describe('Utils factory', () => {
     expect(result).toEqual({ success: false, reason: 'MISSING_URL' });
   });
 
+  test.each([
+    'http://en.wikipedia.org/wiki/Foo',
+    'https://example.org/wiki/Foo',
+    'https://not-a-lang.wikipedia.org/wiki/Foo',
+    'https://en.wikipedia.org.evil.test/wiki/Foo',
+    'https://en.wikipedia.org/api/rest_v1/page/pdf/Foo',
+    'not a url',
+  ])('download() rejects non-Wikipedia page URL %s before fetching', async (downloadUrl) => {
+    const gotClient = jest.fn(async () => ({ body: '<html></html>' }));
+    utils = new Utils(fakeRedis, gotClient);
+
+    const result = await utils.download(downloadUrl);
+
+    expect(result).toEqual({ success: false, reason: 'INVALID_URL' });
+    expect(gotClient).not.toHaveBeenCalled();
+    expect(fakeRedis.connect).not.toHaveBeenCalled();
+  });
+
   test('download() uses configured outbound HTTP proxy', async () => {
     config.http_proxy = 'http://proxy.example:3128';
     const gotClient = jest.fn(async () => ({ body: '<html></html>' }));

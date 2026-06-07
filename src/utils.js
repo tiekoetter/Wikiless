@@ -210,6 +210,24 @@ module.exports = function(redis, gotClient = null) {
     }
   }
 
+  function wikipediaDownloadLang(url) {
+    const wikipediaSuffix = '.wikipedia.org'
+    if(url.protocol !== 'https:' || !url.hostname.endsWith(wikipediaSuffix)) {
+      return null
+    }
+
+    const lang = url.hostname.slice(0, -wikipediaSuffix.length)
+    if(!this.validLang(lang)) {
+      return null
+    }
+
+    if(url.pathname !== '/' && !url.pathname.startsWith('/wiki/') && !url.pathname.startsWith('/w/')) {
+      return null
+    }
+
+    return lang
+  }
+
   function encodeMediaPathSegment(decoded) {
     return encodeURIComponent(decoded)
   }
@@ -277,7 +295,18 @@ module.exports = function(redis, gotClient = null) {
       if (wikipage) url = url.replace(wikipage, encodeURIComponent(wikipage));
     }
   
-    const u = new URL(url);
+    let u
+    try {
+      u = new URL(url);
+    } catch (err) {
+      return { success: false, reason: 'INVALID_URL' };
+    }
+
+    const downloadLang = wikipediaDownloadLang.call(this, u)
+    if(!downloadLang) {
+      return { success: false, reason: 'INVALID_URL' };
+    }
+
     if (params) {
       params.split('&').forEach(p => {
         const [k, v] = p.split('=');
@@ -285,7 +314,7 @@ module.exports = function(redis, gotClient = null) {
       });
     }
     u.searchParams.set('useskin', 'vector');
-    url = u.toString();
+    url = `https://${downloadLang}.wikipedia.org${u.pathname}${u.search}`;
   
     const UA = config.wikimedia_useragent;
   
