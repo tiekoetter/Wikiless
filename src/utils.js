@@ -20,6 +20,20 @@ module.exports = function(redis, gotClient = null) {
     return path.resolve(__dirname, '../media')
   }
 
+  function mediaFetchUrlForUrl(url, mediaFilePath) {
+    if(url.hostname === 'maps.wikimedia.org') {
+      return `https://maps.wikimedia.org${mediaFilePath.urlPath}`
+    }
+    if(url.hostname === 'wikimedia.org') {
+      return `https://wikimedia.org/api${mediaFilePath.urlPath}`
+    }
+    if(url.hostname.endsWith('.wikipedia.org')) {
+      const lang = encodeURIComponent(url.hostname.slice(0, -'.wikipedia.org'.length))
+      return `https://${lang}.wikipedia.org${mediaFilePath.urlPath.replace(/^\/api\/[^/]+/, '')}`
+    }
+    return `https://upload.wikimedia.org${mediaFilePath.urlPath}`
+  }
+
   function normalizeMediaPathFromRequest(rawPath) {
     if(typeof rawPath !== 'string' || !rawPath.startsWith('/') || rawPath.includes('\0') || rawPath.includes('\\')) {
       return null
@@ -332,6 +346,7 @@ module.exports = function(redis, gotClient = null) {
     if(!mediaFilePath) {
       return { success: false, reason: 'INVALID_MEDIA_PATH' }
     }
+    const fetch_url = mediaFetchUrlForUrl(url, mediaFilePath)
 
     const relativePath = mediaFilePath.filePath.replace(/^[/\\]+/, '')
     const path_with_filename = path.resolve(media_path, relativePath)
@@ -371,7 +386,7 @@ module.exports = function(redis, gotClient = null) {
     try {
       await fs.rm(temp_path, { force: true })
       await pipeline(
-        _got.stream(url, options),
+        _got.stream(fetch_url, options),
         createWriteStream(temp_path)
       )
       const stats = await fs.stat(temp_path)

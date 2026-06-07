@@ -27,6 +27,7 @@ describe('Utils factory', () => {
 
   afterEach(async () => {
     await fs.rm(path.join(__dirname, '../media/__test__'), { recursive: true, force: true });
+    await fs.rm(path.join(__dirname, '../media/api/fr/api/rest_v1/page/pdf/Foo'), { force: true });
   });
 
   function createResponse() {
@@ -260,11 +261,25 @@ describe('Utils factory', () => {
 
     expect(result).toEqual({ success: true, path: savedPath });
     expect(mockGotStream).toHaveBeenCalledWith(
-      new URL('https://upload.wikimedia.org/__test__/Santa_Mar%C3%ADa_Catedral.jpg'),
+      'https://upload.wikimedia.org/__test__/Santa_Mar%C3%ADa_Catedral.jpg',
       { headers: { 'User-Agent': 'test-agent' } }
     );
     await expect(fs.readFile(savedPath, 'utf8')).resolves.toBe('image-bytes');
     await expect(fs.stat(`${savedPath}.download`)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('saveFile() streams from generated allow-listed upstream URLs', async () => {
+    const pdfPath = '/api/fr/api/rest_v1/page/pdf/Foo';
+    await fs.rm(path.join(__dirname, '../media/api/fr/api/rest_v1/page/pdf/Foo'), { force: true });
+    await utils.saveFile(
+      new URL('https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo'),
+      pdfPath
+    );
+
+    expect(mockGotStream).toHaveBeenCalledWith(
+      'https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo',
+      { headers: { 'User-Agent': 'test-agent' } }
+    );
   });
 
   test('saveFile() rejects path traversal and malformed encoded paths', async () => {
