@@ -71,9 +71,16 @@ module.exports = (app, utils) => {
       return res.sendFile(wikilessFavicon())
     }
 
+    if(req.url === '/static/images/footer/wikimedia-button.svg') {
+      return res.sendFile(path.join(__dirname, '../static/images/footer/wikimedia-button.svg'))
+    }
+
     // custom wikipedia logos for different languages
     if(req.url.startsWith('/static/images/mobile/copyright/')) { 
       let custom_lang = ''
+      if(req.url.includes('-en.svg')) {
+        custom_lang = 'en'
+      }
       if(req.url.includes('-fr.svg')) {
         custom_lang = 'fr'
       }
