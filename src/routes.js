@@ -204,29 +204,28 @@ module.exports = (app, utils) => {
     return res.send(preferencesPage(req, res))
   })
 
-  // Helper to validate safe redirect paths
-  function isSafeRedirectPath(path) {
-    // Must start with a single slash, not double slash, not contain backslash, not contain protocol
-    return (
-      typeof path === 'string' &&
-      path.startsWith('/') &&
-      !path.startsWith('//') &&
-      !path.includes('\\') &&
-      !/^\/(http|https):/.test(path)
-    );
+  // Helper to sanitize redirect target using a strict internal allowlist
+  function sanitizeBackRedirect(back) {
+    const allowedRedirects = new Set([
+      '/',
+      '/preferences',
+      '/about',
+    ])
+
+    if (typeof back !== 'string') {
+      return '/'
+    }
+
+    return allowedRedirects.has(back) ? back : '/'
   }
 
   app.post('/preferences', (req, res) => {
     const theme = req.body.theme
     const default_lang = req.body.default_lang
-    let back = req.query.back
+    const back = sanitizeBackRedirect(req.query.back)
 
     res.cookie('theme', theme, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: true })
     res.cookie('default_lang', default_lang, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: true })
-
-    if (!isSafeRedirectPath(back)) {
-      back = '/'
-    }
 
     return res.redirect(back)
   })
