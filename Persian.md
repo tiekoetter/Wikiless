@@ -16,7 +16,7 @@
 
 برای اجرای Wikiless مراحل زیر را دنبال کنید:
 ```
-https://github.com/Metastem/Wikiless/wiki
+https://github.com/tiekoetter/Wikiless/wiki
 ```
 
 
@@ -30,15 +30,15 @@ https://github.com/Metastem/Wikiless/wiki
 
 ## TODO
 
-- [x] - رفع مشکل بارگذاری نشدن تصاویر پس از کلیک روی بندانگشتی‌ها - [#161](https://github.com/Metastem/Wikiless/issues/161) و [#162](https://github.com/Metastem/Wikiless/pull/162)  
-- [x] - رفع مشکل از کار افتادن همه پیوندهای زبانی هنگام تنظیم زبان پیش‌فرض دیگر - [#161](https://github.com/Metastem/Wikiless/issues/161)  
+- [x] - رفع مشکل بارگذاری نشدن تصاویر پس از کلیک روی بندانگشتی‌ها - [#161](https://github.com/tiekoetter/Wikiless/issues/161) و [#162](https://github.com/tiekoetter/Wikiless/pull/162)
+- [x] - رفع مشکل از کار افتادن همه پیوندهای زبانی هنگام تنظیم زبان پیش‌فرض دیگر - [#161](https://github.com/tiekoetter/Wikiless/issues/161)
 - [x] - برطرف شدن ۱۰ مشکل امنیتی در [Code Scanning](https://github.com/V4NT-ORG/Wikiless-Reborn/security/code-scanning)  
 - [x] - تقویت بیشتر ```Dockerfile```  
 - [x] - رفع چند باگ کوچک و افزودن محدودیت حافظه و CPU در [```docker-compose.yml```](https://www.baeldung.com/ops/docker-memory-limit)  
-- [ ] - پشتیبانی از سبک‌های مختلف ویکی‌پدیا - [#25](https://github.com/Metastem/Wikiless/issues/25)  
-- [ ] - پشتیبانی از پرش شرطی در صورت مسدود شدن یک نمونه - [#21](https://github.com/Metastem/Wikiless/issues/21)  
+- [ ] - پشتیبانی از سبک‌های مختلف ویکی‌پدیا - [#25](https://github.com/tiekoetter/Wikiless/issues/25)
+- [ ] - پشتیبانی از پرش شرطی در صورت مسدود شدن یک نمونه - [#21](https://github.com/tiekoetter/Wikiless/issues/21)
 - [ ] - رفع خطای بارگیری حلقه‌ای فایل‌های CSS مدیاویکی  
-- [ ] - رفع خطای مسیر جستجو - [#166](https://github.com/Metastem/Wikiless/issues/166)  
+- [ ] - رفع خطای مسیر جستجو - [#166](https://github.com/tiekoetter/Wikiless/issues/166)
 - [ ] - افزودن نسخه‌های زبانی مختلف برای کمک به کاربران در دور زدن سانسور دولتی  
 
 ## مجوز

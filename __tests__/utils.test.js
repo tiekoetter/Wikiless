@@ -2,12 +2,15 @@ jest.mock('../wikiless.config', () => ({
   default_lang: 'en',
   wikimedia_useragent: 'test-agent',
   domain: 'test.example.org',
+  http_proxy: '',
+  no_proxy: '',
   setexs: { wikipage: 3600 },
 }));
 
 const fs = require('fs').promises;
 const path = require('path');
 const { Readable } = require('stream');
+const config = require('../wikiless.config');
 const Utils = require('../src/utils.js');
 
 describe('Utils factory', () => {
@@ -22,6 +25,8 @@ describe('Utils factory', () => {
       connect: jest.fn().mockResolvedValue(),
     };
     utils = new Utils(fakeRedis, { stream: (...args) => mockGotStream(...args) });
+    config.http_proxy = '';
+    config.no_proxy = '';
     global.protocol = 'https://';
   });
 
@@ -45,6 +50,36 @@ describe('Utils factory', () => {
   test('download(): missing URL returns proper error', async () => {
     const result = await utils.download('');
     expect(result).toEqual({ success: false, reason: 'MISSING_URL' });
+  });
+
+  test('download() uses configured outbound HTTP proxy', async () => {
+    config.http_proxy = 'http://proxy.example:3128';
+    const gotClient = jest.fn(async () => ({ body: '<html></html>' }));
+    utils = new Utils(fakeRedis, gotClient);
+
+    const result = await utils.download('https://en.wikipedia.org/wiki/Foo');
+
+    expect(result.success).toBe(true);
+    expect(gotClient).toHaveBeenCalledWith(
+      'https://en.wikipedia.org/wiki/Foo?useskin=vector',
+      expect.objectContaining({
+        agent: expect.objectContaining({
+          http: expect.any(Object),
+          https: expect.any(Object),
+        }),
+      })
+    );
+  });
+
+  test('download() honors NO_PROXY for matching hosts', async () => {
+    config.http_proxy = 'http://proxy.example:3128';
+    config.no_proxy = '.wikipedia.org';
+    const gotClient = jest.fn(async () => ({ body: '<html></html>' }));
+    utils = new Utils(fakeRedis, gotClient);
+
+    await utils.download('https://en.wikipedia.org/wiki/Foo');
+
+    expect(gotClient.mock.calls[0][1]).not.toHaveProperty('agent');
   });
 
   test('validHtml() recognizes real HTML', () => {
@@ -301,6 +336,24 @@ describe('Utils factory', () => {
           Origin: 'https://fr.wikipedia.org',
         },
       }
+    );
+  });
+
+  test('saveFile() uses configured outbound HTTP proxy for media requests', async () => {
+    config.http_proxy = 'http://proxy.example:3128';
+    await utils.saveFile(
+      new URL('https://upload.wikimedia.org/__test__/proxied.jpg'),
+      '/__test__/proxied.jpg'
+    );
+
+    expect(mockGotStream).toHaveBeenCalledWith(
+      'https://upload.wikimedia.org/__test__/proxied.jpg',
+      expect.objectContaining({
+        agent: expect.objectContaining({
+          http: expect.any(Object),
+          https: expect.any(Object),
+        }),
+      })
     );
   });
 

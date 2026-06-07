@@ -16,7 +16,7 @@
 
 运行 Wikiless 的步骤如下：
 ```
-https://github.com/Metastem/Wikiless/wiki
+https://github.com/tiekoetter/Wikiless/wiki
 ```
 
 
@@ -30,15 +30,15 @@ https://github.com/Metastem/Wikiless/wiki
 
 ## TODO
 
-- [x] - 修复点击缩略图后图片无法加载的问题 - [#161](https://github.com/Metastem/Wikiless/issues/161) 和 [#162](https://github.com/Metastem/Wikiless/pull/162)
-- [x] - 修复在设置为其他默认语言时，所有语言链接失效的问题 - [#161](https://github.com/Metastem/Wikiless/issues/161)
+- [x] - 修复点击缩略图后图片无法加载的问题 - [#161](https://github.com/tiekoetter/Wikiless/issues/161) 和 [#162](https://github.com/tiekoetter/Wikiless/pull/162)
+- [x] - 修复在设置为其他默认语言时，所有语言链接失效的问题 - [#161](https://github.com/tiekoetter/Wikiless/issues/161)
 - [x] - 已修复 [Code Scanning](https://github.com/V4NT-ORG/Wikiless-Reborn/security/code-scanning) 中的 10 个安全问题
 - [x] - 进一步加固 ```Dockerfile```
 - [x] - 修复了一些小 bug，并在 [```docker-compose.yml```](https://www.baeldung.com/ops/docker-memory-limit) 中添加了内存和 CPU 限制
-- [ ] - 支持其他维基百科样式 - [#25](https://github.com/Metastem/Wikiless/issues/25)
-- [ ] - 如果某个实例被封锁，则支持条件性跳转 - [#21](https://github.com/Metastem/Wikiless/issues/21)
+- [ ] - 支持其他维基百科样式 - [#25](https://github.com/tiekoetter/Wikiless/issues/25)
+- [ ] - 如果某个实例被封锁，则支持条件性跳转 - [#21](https://github.com/tiekoetter/Wikiless/issues/21)
 - [ ] - 修复 MediaWiki CSS 文件循环下载错误
-- [ ] - 修复搜索路由错误 - [#166](https://github.com/Metastem/Wikiless/issues/166)
+- [ ] - 修复搜索路由错误 - [#166](https://github.com/tiekoetter/Wikiless/issues/166)
 - [ ] - 增加不同语言版本，帮助用户在本国突破政府审查
 
 ## 许可证

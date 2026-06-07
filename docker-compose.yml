@@ -14,6 +14,8 @@ services:
       REDIS_URL: redis://wikiless_redis:6379
       DEFAULT_LANG: ${DEFAULT_LANG:-en}
       THEME: ${THEME:-dark}
+      WIKILESS_HTTP_PROXY: ${WIKILESS_HTTP_PROXY:-}
+      WIKILESS_NO_PROXY: ${WIKILESS_NO_PROXY:-}
     ports:
       - "127.0.0.1:8180:8080" # change port if needed
     security_opt:
