@@ -3,6 +3,8 @@ module.exports = function(redis, gotClient = null) {
   const parser = require('node-html-parser')
   const fs = require('fs').promises
   const { createWriteStream } = require('fs')
+  const { HttpProxyAgent } = require('http-proxy-agent')
+  const { HttpsProxyAgent } = require('https-proxy-agent')
   const path = require('path')
   const crypto = require('crypto')
   const stream = require('stream')
@@ -164,6 +166,68 @@ module.exports = function(redis, gotClient = null) {
     return headers
   }
 
+  function noProxyMatches(url) {
+    const noProxy = config.no_proxy
+    if(!noProxy) {
+      return false
+    }
+
+    const host = url.hostname.toLowerCase()
+    const hostWithPort = `${host}:${url.port || (url.protocol === 'https:' ? '443' : '80')}`
+    return noProxy.split(',').some((entry) => {
+      entry = entry.trim().toLowerCase()
+      if(!entry) {
+        return false
+      }
+      if(entry === '*') {
+        return true
+      }
+      if(entry === host || entry === hostWithPort) {
+        return true
+      }
+      if(entry.startsWith('*.')) {
+        return host.endsWith(entry.slice(1))
+      }
+      if(entry.startsWith('.')) {
+        return host === entry.slice(1) || host.endsWith(entry)
+      }
+      return false
+    })
+  }
+
+  function gotOptionsForUrl(url, options) {
+    if(!config.http_proxy || noProxyMatches(url)) {
+      return options
+    }
+
+    return {
+      ...options,
+      agent: {
+        http: new HttpProxyAgent(config.http_proxy),
+        https: new HttpsProxyAgent(config.http_proxy),
+        ...(options.agent || {})
+      }
+    }
+  }
+
+  function wikipediaDownloadLang(url) {
+    const wikipediaSuffix = '.wikipedia.org'
+    if(url.protocol !== 'https:' || !url.hostname.endsWith(wikipediaSuffix)) {
+      return null
+    }
+
+    const lang = url.hostname.slice(0, -wikipediaSuffix.length)
+    if(!this.validLang(lang)) {
+      return null
+    }
+
+    if(url.pathname !== '/' && !url.pathname.startsWith('/wiki/') && !url.pathname.startsWith('/w/')) {
+      return null
+    }
+
+    return lang
+  }
+
   function encodeMediaPathSegment(decoded) {
     return encodeURIComponent(decoded)
   }
@@ -231,7 +295,18 @@ module.exports = function(redis, gotClient = null) {
       if (wikipage) url = url.replace(wikipage, encodeURIComponent(wikipage));
     }
   
-    const u = new URL(url);
+    let u
+    try {
+      u = new URL(url);
+    } catch (err) {
+      return { success: false, reason: 'INVALID_URL' };
+    }
+
+    const downloadLang = wikipediaDownloadLang.call(this, u)
+    if(!downloadLang) {
+      return { success: false, reason: 'INVALID_URL' };
+    }
+
     if (params) {
       params.split('&').forEach(p => {
         const [k, v] = p.split('=');
@@ -239,7 +314,7 @@ module.exports = function(redis, gotClient = null) {
       });
     }
     u.searchParams.set('useskin', 'vector');
-    url = u.toString();
+    url = `https://${downloadLang}.wikipedia.org${u.pathname}${u.search}`;
   
     const UA = config.wikimedia_useragent;
   
@@ -255,10 +330,10 @@ module.exports = function(redis, gotClient = null) {
     }
   
     try {
-      const { body } = await _got(url, {
+      const { body } = await _got(url, gotOptionsForUrl(u, {
         headers: { 'User-Agent': UA },
         timeout: { request: 10000 }
-      });
+      }));
       console.log(`Fetched ${url} from Wikipedia.`);
       return { success: true, html: body, processed: false, url };
     } catch (err) {
@@ -501,7 +576,7 @@ module.exports = function(redis, gotClient = null) {
     }
     const path_without_filename = path.dirname(path_with_filename)
     const temp_path = `${path_with_filename}.download`
-    const options = { headers: mediaRequestHeaders.call(this, url, req) }
+    const options = gotOptionsForUrl(url, { headers: mediaRequestHeaders.call(this, url, req) })
 
     try {
       const stats = await fs.stat(path_with_filename)
