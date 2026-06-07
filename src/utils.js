@@ -10,6 +10,47 @@ module.exports = function(redis, gotClient = null) {
 
   let _got = gotClient;
 
+  function pathInside(parent, child) {
+    const relative = path.relative(parent, child)
+    return relative === '' || (relative && !relative.startsWith('..') && !path.isAbsolute(relative))
+  }
+
+  function mediaRootForUrl(url) {
+    if(url.hostname === 'maps.wikimedia.org') {
+      return path.resolve(__dirname, '../media/maps_wikimedia_org')
+    }
+    if(url.hostname === 'wikimedia.org' && url.pathname.startsWith('/api/')) {
+      return path.resolve(__dirname, '../media/api')
+    }
+    return path.resolve(__dirname, '../media')
+  }
+
+  function resolveMediaPath(mediaRoot, filePath) {
+    const decodedPath = decodeURIComponent(filePath)
+    const relativePath = decodedPath.replace(/^[/\\]+/, '')
+    const resolvedPath = path.resolve(mediaRoot, relativePath)
+
+    if(!pathInside(mediaRoot, resolvedPath)) {
+      return null
+    }
+    return resolvedPath
+  }
+
+  this.validMediaUrl = (url) => {
+    if(url.protocol !== 'https:') {
+      return false
+    }
+    if(['upload.wikimedia.org', 'maps.wikimedia.org', 'wikimedia.org'].includes(url.hostname)) {
+      return true
+    }
+    const wikipediaSuffix = '.wikipedia.org'
+    if(url.hostname.endsWith(wikipediaSuffix)) {
+      const lang = url.hostname.slice(0, -wikipediaSuffix.length)
+      return this.validLang(lang)
+    }
+    return false
+  }
+
   this.download = async (url, params = '') => {
     if (!url) return { success: false, reason: 'MISSING_URL' };
 
@@ -261,16 +302,20 @@ module.exports = function(redis, gotClient = null) {
   }
 
   this.saveFile = async (url, file_path) => {
-    let media_path = ''
-    if(url.href.startsWith('https://maps.wikimedia.org/')) {
-      media_path = path.join(__dirname, '../media/maps_wikimedia_org')
-    } else if(url.href.startsWith('https://wikimedia.org/media/api/')) {
-      media_path = path.join(__dirname, '../media/api')
-    } else {
-      media_path = path.join(__dirname, '../media')
+    if(!this.validMediaUrl(url)) {
+      return { success: false, reason: 'INVALID_MEDIA_URL' }
     }
 
-    const path_with_filename = decodeURI(`${media_path}${file_path}`)
+    const media_path = mediaRootForUrl(url)
+    let path_with_filename
+    try {
+      path_with_filename = resolveMediaPath(media_path, file_path)
+    } catch(err) {
+      return { success: false, reason: 'INVALID_MEDIA_PATH' }
+    }
+    if(!path_with_filename) {
+      return { success: false, reason: 'INVALID_MEDIA_PATH' }
+    }
     const path_without_filename = path.dirname(path_with_filename)
     const temp_path = `${path_with_filename}.download`
     const options = {

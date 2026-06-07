@@ -237,6 +237,16 @@ describe('Utils factory', () => {
     })).resolves.toEqual({ success: false, reason: 'SAVEFILE_ERROR' });
   });
 
+  test('validMediaUrl() only accepts expected Wikimedia media hosts', () => {
+    expect(utils.validMediaUrl(new URL('https://upload.wikimedia.org/wikipedia/commons/Foo.png'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('https://maps.wikimedia.org/osm-intl/Foo.png'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('https://wikimedia.org/api/rest_v1/media/Foo'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('http://upload.wikimedia.org/wikipedia/commons/Foo.png'))).toBe(false);
+    expect(utils.validMediaUrl(new URL('https://example.org/wikipedia/commons/Foo.png'))).toBe(false);
+    expect(utils.validMediaUrl(new URL('https://not-a-lang.wikipedia.org/api/rest_v1/page/pdf/Foo'))).toBe(false);
+  });
+
   test('saveFile() retries and replaces zero-byte cached media files', async () => {
     const filePath = '/__test__/Santa_Mar%C3%ADa_Catedral.jpg';
     const savedPath = path.join(__dirname, '../media/__test__/Santa_María_Catedral.jpg');
@@ -255,6 +265,29 @@ describe('Utils factory', () => {
     );
     await expect(fs.readFile(savedPath, 'utf8')).resolves.toBe('image-bytes');
     await expect(fs.stat(`${savedPath}.download`)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('saveFile() rejects path traversal and malformed encoded paths', async () => {
+    await expect(utils.saveFile(
+      new URL('https://upload.wikimedia.org/wikipedia/commons/Foo.png'),
+      '/../wikiless.config'
+    )).resolves.toEqual({ success: false, reason: 'INVALID_MEDIA_PATH' });
+
+    await expect(utils.saveFile(
+      new URL('https://upload.wikimedia.org/wikipedia/commons/Foo.png'),
+      '/%E0%A4%A'
+    )).resolves.toEqual({ success: false, reason: 'INVALID_MEDIA_PATH' });
+
+    expect(mockGotStream).not.toHaveBeenCalled();
+  });
+
+  test('saveFile() rejects unexpected upstream media hosts before streaming', async () => {
+    await expect(utils.saveFile(
+      new URL('https://example.org/wikipedia/commons/Foo.png'),
+      '/wikipedia/commons/Foo.png'
+    )).resolves.toEqual({ success: false, reason: 'INVALID_MEDIA_URL' });
+
+    expect(mockGotStream).not.toHaveBeenCalled();
   });
 
   test('saveFile() removes incomplete temp files when downloads fail', async () => {
