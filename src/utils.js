@@ -322,11 +322,11 @@ module.exports = function(redis, gotClient = null) {
       if (!redis.isOpen) await redis.connect();
       const cached = await redis.get(url);
       if (cached) {
-        console.log(`Got key ${url} from cache.`);
+        console.log('Got key %s from cache.', url);
         return { success: true, html: cached, processed: true, url };
       }
     } catch (err) {
-      console.error(`Redis GET error for ${url}:`, err);
+      console.error('Redis GET error for %s:', url, err);
     }
   
     try {
@@ -334,11 +334,11 @@ module.exports = function(redis, gotClient = null) {
         headers: { 'User-Agent': UA },
         timeout: { request: 10000 }
       }));
-      console.log(`Fetched ${url} from Wikipedia.`);
+      console.log('Fetched %s from Wikipedia.', url);
       return { success: true, html: body, processed: false, url };
     } catch (err) {
       const status = err.response?.statusCode ?? 'NO_RESPONSE';
-      console.error(`Download error for ${url}:`, err.code ?? err.message);
+      console.error('Download error for %s:', url, err.code ?? err.message);
       return {
         success: false,
         reason: status === 404 ? 'REDIRECT' : `INVALID_HTTP_RESPONSE: ${status}`,
@@ -389,7 +389,7 @@ module.exports = function(redis, gotClient = null) {
     return data
   }
 
-  this.processHtml = async (data, url, params, lang) => {
+  this.processHtml = async (data, url, params, lang, cookies = {}, csrfToken = '') => {
     if(this.validHtml(data.html)) {
       url = encodeURI(url)
       if(params) {
@@ -429,6 +429,9 @@ module.exports = function(redis, gotClient = null) {
       let forms = data.html.querySelectorAll('form')
       for(let i = 0; i < forms.length; i++) {
         forms[i].insertAdjacentHTML('afterbegin', `<input type="hidden" name="lang" value="${lang}">`)
+        if(csrfToken) {
+          forms[i].insertAdjacentHTML('afterbegin', `<input type="hidden" name="_csrf" value="${csrfToken}">`)
+        }
       }
       // remove #p-wikibase-otherprojects
       let wikibase_links = data.html.querySelector('#p-wikibase-otherprojects')
@@ -712,7 +715,8 @@ module.exports = function(redis, gotClient = null) {
 
     // wikiless params
     const down_params = new URLSearchParams(req.query).toString()
-    const process_html = await this.processHtml(result, url, down_params, lang, req.cookies)
+    const csrfToken = typeof req.csrfToken === 'function' ? req.csrfToken() : ''
+    const process_html = await this.processHtml(result, url, down_params, lang, req.cookies, csrfToken)
     if(process_html.success === true) {
       return res.send(this.applyUserMods(process_html.html.toString(), req.cookies.theme, lang, isMobile))
     }
@@ -870,6 +874,8 @@ module.exports = function(redis, gotClient = null) {
     lang_select += '</select>'
 
     const back = encodeURIComponent((req.query && req.query.back) || '/')
+    const csrfToken = typeof req.csrfToken === 'function' ? req.csrfToken() : ''
+    const csrfInput = csrfToken ? `<input type="hidden" name="_csrf" value="${csrfToken}">` : ''
 
     const html = `
       <!DOCTYPE html>
@@ -884,6 +890,7 @@ module.exports = function(redis, gotClient = null) {
           <div id="preferences">
             <h4>Preferences</h4>
             <form method="POST" action="/preferences?back=${back}">
+              ${csrfInput}
               <div class="setting">
                 <div class="label">
                   <label for="theme">Theme:</label>

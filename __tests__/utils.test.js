@@ -194,12 +194,15 @@ describe('Utils factory', () => {
       },
       'https://en.wikipedia.org/wiki/Foo',
       'oldid=1',
-      'en'
+      'en',
+      {},
+      'csrf-token'
     );
 
     expect(result.success).toBe(true);
     expect(result.html).toContain('<a href="/about">[ about ]</a>');
     expect(result.html).toContain('<a href="/preferences?back=/wiki/Foo?oldid=1">[ preferences ]</a>');
+    expect(result.html).toContain('<input type="hidden" name="_csrf" value="csrf-token">');
     expect(result.html).toContain('<input type="hidden" name="lang" value="en">');
     expect(result.html).not.toContain('p-wikibase-otherprojects');
     expect(result.html).toContain('href="/wiki/Foo?lang=fr"');
@@ -511,7 +514,8 @@ describe('Utils factory', () => {
       'https://en.wikipedia.org/w/index.php',
       'lang=en',
       'en',
-      req.cookies
+      req.cookies,
+      ''
     );
     expect(res.send).toHaveBeenCalledWith('PROCESSED_MODDED');
   });
@@ -571,8 +575,10 @@ describe('Utils factory', () => {
     const html = utils.preferencesPage({
       cookies: { default_lang: 'en', theme: 'dark' },
       query: { back: '/wiki/Foo?lang=en' },
+      csrfToken: () => 'csrf-token',
     });
 
     expect(html).toContain('action="/preferences?back=%2Fwiki%2FFoo%3Flang%3Den"');
+    expect(html).toContain('<input type="hidden" name="_csrf" value="csrf-token">');
   });
 });
