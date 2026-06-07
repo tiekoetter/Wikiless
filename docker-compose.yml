@@ -1,5 +1,6 @@
 services:
   wikiless:
+    image: ghcr.io/tiekoetter/wikiless:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,7 +10,10 @@ services:
     networks:
       - wikiless_net
     environment:
-      REDIS_HOST: redis://wikiless_redis:6379
+      DOMAIN: ${DOMAIN:-localhost:8180}
+      REDIS_URL: redis://wikiless_redis:6379
+      DEFAULT_LANG: ${DEFAULT_LANG:-en}
+      THEME: ${THEME:-dark}
     ports:
       - "127.0.0.1:8180:8080" # change port if needed
     security_opt:
@@ -22,7 +26,8 @@ services:
           memory: 512M
           cpus: '0.5'
     depends_on:
-        - wikiless_redis
+      wikiless_redis:
+        condition: service_healthy
 
   wikiless_redis:
     image: redis:8-alpine
@@ -41,6 +46,11 @@ services:
     cap_add:
       - SETUID
       - SETGID
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     deploy:
       resources:
         limits:
