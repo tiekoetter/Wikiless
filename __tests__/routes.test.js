@@ -2,6 +2,7 @@ const express = require('express');
 const request = require('supertest');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
+const crypto = require('crypto');
 
 // Mock config
 jest.mock('../wikiless.config', () => ({ theme: 'auto', default_lang: 'en' }));
@@ -20,17 +21,10 @@ jest.mock('../src/utils.js', () => {
   };
 });
 
-// Load utils and assign global functions expected by routes.js
+// Load utils and mount routes
 const utilsFactory = require('../src/utils.js');
 const utils = utilsFactory();
-global.handleWikiPage   = utils.handleWikiPage;
-global.proxyMedia       = utils.proxyMedia;
-global.preferencesPage  = utils.preferencesPage;
-global.customLogos      = utils.customLogos;
-global.wikilessLogo     = utils.wikilessLogo;
-global.wikilessFavicon = utils.wikilessFavicon;
 
-// Load and mount routes
 const routes = require('../src/routes');
 let app;
 beforeEach(() => {
@@ -78,6 +72,14 @@ describe('Routes wiring', () => {
     expect(ck).toMatch(/default_lang=fr/);
   });
 
+  it('POST /preferences accepts encoded safe redirect paths', async () => {
+    const res = await request(app)
+      .post('/preferences?back=%2Fxyz')
+      .send('theme=dark&default_lang=fr');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/xyz');
+  });
+
   it('GET /preferences -> render preferences page', async () => {
     const res = await request(app).get('/preferences');
     expect(res.status).toBe(200);
@@ -94,6 +96,16 @@ describe('Routes wiring', () => {
     );
   });
 
+  it('GET /wiki/File:* redirects to the commons media path', async () => {
+    const fileName = 'Example:One.jpg';
+    const hash = crypto.createHash('md5').update(fileName, 'utf8').digest('hex');
+    const res = await request(app).get(`/wiki/File:${fileName}`);
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(
+      `/media/wikipedia/commons/${hash[0]}/${hash.slice(0, 2)}/Example%3AOne.jpg`
+    );
+  });
+
   it('GET /w/:file -> handleWikiPage with /w/', async () => {
     const res = await request(app).get('/w/file.png');
     expect(res.status).toBe(200);
@@ -103,4 +115,3 @@ describe('Routes wiring', () => {
     );
   });
 });
-

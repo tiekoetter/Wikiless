@@ -1,7 +1,15 @@
 module.exports = (app, utils) => {
   const config = require('../wikiless.config')
   const path = require('path')
-  const crypto = require('crypto');
+  const crypto = require('crypto')
+  const {
+    customLogos,
+    handleWikiPage,
+    preferencesPage,
+    proxyMedia,
+    wikilessFavicon,
+    wikilessLogo,
+  } = utils
 
   app.all(/.*/, (req, res, next) => {
     let themeOverride = req.query.theme
@@ -46,7 +54,7 @@ module.exports = (app, utils) => {
       }
 
       if(media.success === true) {
-        if(mime != '') {
+        if(mime !== '') {
           res.setHeader('Content-Type', mime)
         }
 
@@ -86,32 +94,36 @@ module.exports = (app, utils) => {
   })
 
   function md5HashParts(fileName) {
-    const normalized = fileName.replace(/ /g, '_');
-    const h = crypto.createHash('md5').update(normalized, 'utf8').digest('hex');
-    return [h[0], h.slice(0,2)];
+    const normalized = fileName.replace(/ /g, '_')
+    const h = crypto.createHash('md5').update(normalized, 'utf8').digest('hex')
+    return [h[0], h.slice(0, 2)]
+  }
+
+  function redirectFilePage(req, res) {
+    const pageName = req.params.page
+    if (!pageName || !pageName.startsWith('File:')) {
+      return false
+    }
+
+    const rawName = pageName.slice('File:'.length)
+    const encodedFileName = encodeURIComponent(rawName)
+    const [h1, h2] = md5HashParts(rawName)
+    const mediaPath = `/media/wikipedia/commons/${h1}/${h2}/${encodedFileName}`
+    res.redirect(mediaPath)
+    return true
   }
 
 
-  app.get('/wiki/:page/:sub_page', (req, res, next) => {
-    const pageName = req.params.page;
-    if (pageName && pageName.startsWith('File:')) {
-        const rawName = pageName.split(':')[1];
-        const encodedFileName = encodeURIComponent(rawName);
-        const [h1, h2] = md5HashParts(rawName);
-        const mediaPath = `/media/wikipedia/commons/${h1}/${h2}/${encodedFileName}`;
-        return res.redirect(mediaPath)
+  app.get('/wiki/:page/:sub_page', (req, res) => {
+    if (redirectFilePage(req, res)) {
+      return
     }
     return handleWikiPage(req, res, '/wiki/')
   })
 
-  app.get('/wiki/:page', (req, res, next) => {
-    const pageName = req.params.page;
-    if (pageName && pageName.startsWith('File:')) {
-        const rawName = pageName.split(':')[1];
-        const encodedFileName = encodeURIComponent(rawName);
-        const [h1, h2] = md5HashParts(rawName);
-        const mediaPath = `/media/wikipedia/commons/${h1}/${h2}/${encodedFileName}`;
-        return res.redirect(mediaPath)
+  app.get('/wiki/:page', (req, res) => {
+    if (redirectFilePage(req, res)) {
+      return
     }
     return handleWikiPage(req, res, '/wiki/')
   })
@@ -182,10 +194,10 @@ module.exports = (app, utils) => {
     );
   }
 
-  app.post('/preferences', (req, res, next) => {
+  app.post('/preferences', (req, res) => {
     const theme = req.body.theme
     const default_lang = req.body.default_lang
-    let back = req.url.split('?back=')[1]
+    let back = req.query.back
 
     res.cookie('theme', theme, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: true })
     res.cookie('default_lang', default_lang, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: true })

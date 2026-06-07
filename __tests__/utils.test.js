@@ -19,6 +19,7 @@ describe('Utils factory', () => {
       connect: jest.fn().mockResolvedValue(),
     };
     utils = new Utils(fakeRedis);
+    global.protocol = 'https://';
   });
 
   test('download(): missing URL returns proper error', async () => {
@@ -59,5 +60,32 @@ describe('Utils factory', () => {
     const dark = utils.applyUserMods(html, 'dark', 'en');
     expect(dark).toContain(`wikipedia_styles_dark.css`);
   });
-});
 
+  test('processHtml() strips scripts, iframes, and event handlers', async () => {
+    const result = await utils.processHtml(
+      {
+        url: 'https://en.wikipedia.org/wiki/Foo?useskin=vector',
+        html: '<html><head></head><body><a href="/wiki/Foo" onClick="evil()">Foo</a><div onload="evil()"></div><script>bad()</script><iframe></iframe></body></html>',
+      },
+      'https://en.wikipedia.org/wiki/Foo',
+      '',
+      'en'
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.html).not.toContain('onClick');
+    expect(result.html).not.toContain('onload');
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).not.toContain('<iframe>');
+    expect(result.html).toContain('href="/wiki/Foo?lang=en"');
+  });
+
+  test('preferencesPage() encodes the back path in the form action', () => {
+    const html = utils.preferencesPage({
+      cookies: { default_lang: 'en', theme: 'dark' },
+      query: { back: '/wiki/Foo?lang=en' },
+    });
+
+    expect(html).toContain('action="/preferences?back=%2Fwiki%2FFoo%3Flang%3Den"');
+  });
+});

@@ -72,8 +72,7 @@ module.exports = function(redis) {
 
     // load custom language specific languages
     let lang_suffix = ''
-    let load_custom_styles = ['de', 'fr', 'ko', 'vi']
-
+    const load_custom_styles = ['de', 'fr', 'ko', 'vi']
     
     if(load_custom_styles.includes(lang)) {
       lang_suffix = '_' + lang
@@ -108,8 +107,7 @@ module.exports = function(redis) {
   }
 
   this.processHtml = async (data, url, params, lang) => {
-    if(validHtml(data.html)) {
-      const decoded_url = url
+    if(this.validHtml(data.html)) {
       url = encodeURI(url)
       if(params) {
         url = `${url}?${params}`
@@ -165,13 +163,12 @@ module.exports = function(redis) {
         iframe_elements[i].remove()
       }
       // remove all JavaScript event attributes
-      let event_attributes = ['[onAbort]', '[onBlur]', '[onChange]', '[onClick]', '[onDblClick]', '[onError]', '[onFocus]', '[onKeydown]', '[onKeypress]', '[onKeyup]', '[onLoad]'
-, '[onMousedown]', '[onMousemove]', '[onMouseout]', '[onMouseover]', '[onMouseUp]', '[onReset]', '[onSelect]', '[onSubmit]', '[onUnload]']
-      let elements_with_event_attr = data.html.querySelectorAll(event_attributes.join(','))
-      for(let i = 0; i < elements_with_event_attr.length; i++) {
-        for(let j = 0; j < event_attributes.length; j++) {
-          if(typeof(elements_with_event_attr.removeAttribute) === 'function') {
-            elements_with_event_attr.removeAttribute(event_attributes[j])
+      const elements = data.html.querySelectorAll('*')
+      for(let i = 0; i < elements.length; i++) {
+        const attrs = Object.keys(elements[i].attributes || {})
+        for(let j = 0; j < attrs.length; j++) {
+          if(/^on/i.test(attrs[j])) {
+            elements[i].removeAttribute(attrs[j])
           }
         }
       }
@@ -254,8 +251,8 @@ module.exports = function(redis) {
         path = req.url.split('/media')[1]
         wikimedia_path = path + params
     }
-    url = new URL(`https://${domain}${wikimedia_path}`)
-    const file = await saveFile(url, path)
+    const url = new URL(`https://${domain}${wikimedia_path}`)
+    const file = await this.saveFile(url, path)
 
     if(file.success === true) {
       return { success: true, path: file.path }
@@ -306,7 +303,7 @@ module.exports = function(redis) {
   }
 
   this.handleWikiPage = async (req, res, prefix) => {
-    let lang = getLang(req)
+    let lang = this.getLang(req)
 
     if(lang) {
       if(Array.isArray(lang)) {
@@ -316,7 +313,7 @@ module.exports = function(redis) {
       }
     }
 
-    if(!validLang(lang)) {
+    if(!this.validLang(lang)) {
       return res.status(500).send('invalid lang')
     }
 
@@ -361,7 +358,7 @@ module.exports = function(redis) {
     // set skin
     params.set('useskin', 'vector')
     const up_params = params.toString()
-    const result = await download(url, up_params)
+    const result = await this.download(url, up_params)
 
     if(result.success !== true) {
       if(result.reason === 'REDIRECT' && result.url) {
@@ -390,14 +387,14 @@ module.exports = function(redis) {
     }
 
     if(result.processed === true) {
-      return res.send(applyUserMods(result.html, req.cookies.theme, lang, isMobile))
+      return res.send(this.applyUserMods(result.html, req.cookies.theme, lang, isMobile))
     }
 
     // wikiless params
     const down_params = new URLSearchParams(req.query).toString()
-    const process_html = await processHtml(result, url, down_params, lang, req.cookies)
+    const process_html = await this.processHtml(result, url, down_params, lang, req.cookies)
     if(process_html.success === true) {
-      return res.send(applyUserMods(process_html.html.toString(), req.cookies.theme, lang, isMobile))
+      return res.send(this.applyUserMods(process_html.html.toString(), req.cookies.theme, lang, isMobile))
     }
     return res.status(500).send(process_html.reason)
   }
@@ -464,7 +461,7 @@ module.exports = function(redis) {
   }
 
   this.customLogos = (url, lang) => {
-    if(validLang(lang)) {
+    if(this.validLang(lang)) {
       return path.join(__dirname, '..', 'static', lang, path.basename(url))
     }
     return false
@@ -538,7 +535,7 @@ module.exports = function(redis) {
   this.preferencesPage = (req, res) => {
     const { default_lang, theme } = req.cookies
     let lang_select = '<select id="default_lang" name="default_lang">'
-    const valid_langs = validLang('', true)
+    const valid_langs = this.validLang('', true)
 
     for(let i = 0; i < valid_langs.length; i++) {
       let selected = ''
@@ -552,7 +549,7 @@ module.exports = function(redis) {
 
     lang_select += '</select>'
 
-    const back = req.url.split('?back=')[1]
+    const back = encodeURIComponent((req.query && req.query.back) || '/')
 
     const html = `
       <!DOCTYPE html>
@@ -560,7 +557,7 @@ module.exports = function(redis) {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <link rel="stylesheet" href="/styles.css"></head>
+          <link rel="stylesheet" href="/styles.css">
           <title>Preferences - Wikiless</title>
         </head>
         <body>
@@ -574,8 +571,8 @@ module.exports = function(redis) {
                 <div class="option">
                   <select id="theme" name="theme">
                     <option value="" ${(!theme ? 'selected' : '')}>Auto</option>
-                    <option value="white" ${(theme == 'white' ? 'selected' : '')}>Light Mode</option>
-                    <option value="dark" ${(theme == 'dark' ? 'selected' : '')}>Dark Mode</option>
+                    <option value="white" ${(theme === 'white' ? 'selected' : '')}>Light Mode</option>
+                    <option value="dark" ${(theme === 'dark' ? 'selected' : '')}>Dark Mode</option>
                   </select>
                 </div>
               </div>
@@ -601,4 +598,6 @@ module.exports = function(redis) {
 
     return html
   }
+
+  return this
 }
