@@ -204,19 +204,25 @@ module.exports = (app, utils) => {
     return res.send(preferencesPage(req, res))
   })
 
-  // Helper to sanitize redirect target using a strict internal allowlist
+  // Helper to sanitize redirect targets to same-origin internal paths.
   function sanitizeBackRedirect(back) {
-    const allowedRedirects = new Set([
-      '/',
-      '/preferences',
-      '/about',
-    ])
-
     if (typeof back !== 'string') {
       return '/'
     }
 
-    return allowedRedirects.has(back) ? back : '/'
+    const localOrigin = 'https://wikiless.local'
+    let parsed
+    try {
+      parsed = new URL(back, localOrigin)
+    } catch(err) {
+      return '/'
+    }
+
+    if(parsed.origin !== localOrigin || parsed.pathname.includes('\\')) {
+      return '/'
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
   }
 
   app.post('/preferences', (req, res) => {
