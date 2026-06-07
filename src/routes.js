@@ -2,6 +2,7 @@ module.exports = (app, utils) => {
   const config = require('../wikiless.config')
   const path = require('path')
   const crypto = require('crypto')
+  const rateLimit = require('express-rate-limit')
   const {
     customLogos,
     handleWikiPage,
@@ -10,6 +11,13 @@ module.exports = (app, utils) => {
     wikilessFavicon,
     wikilessLogo,
   } = utils
+
+  const filesystemRateLimit = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false
+  })
 
   app.all(/.*/, (req, res, next) => {
     let themeOverride = req.query.theme
@@ -33,7 +41,7 @@ module.exports = (app, utils) => {
     return next()
   })
 
-  app.get(/.*/, async (req, res, next) => {
+  app.get(/.*/, filesystemRateLimit, async (req, res, next) => {
     if(req.url.startsWith('/w/load.php')) {
       return res.sendStatus(404)
     }
@@ -170,7 +178,7 @@ module.exports = (app, utils) => {
     return handleWikiPage(req, res, '/wiki/Map')
   })
 
-  app.get('/api/rest_v1/page/pdf/:page', async (req, res, next) => {
+  app.get('/api/rest_v1/page/pdf/:page', filesystemRateLimit, async (req, res, next) => {
     if(!req.params.page) {
       return res.redirect('/')
     }
@@ -196,7 +204,7 @@ module.exports = (app, utils) => {
     return handleWikiPage(req, res, '/')
   })
 
-  app.get('/about', (req, res, next) => {
+  app.get('/about', filesystemRateLimit, (req, res, next) => {
     return res.sendFile(path.join(__dirname, '../static/about.html'))
   })
 

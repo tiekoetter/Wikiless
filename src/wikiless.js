@@ -3,6 +3,8 @@ const compression = require('compression')
 const path = require('path')
 const express = require('express')
 const cookieParser = require('cookie-parser')
+const lusca = require('lusca')
+const crypto = require('crypto')
 const fs = require('fs')
 const app = express()
 const r = require('redis')
@@ -45,6 +47,34 @@ if(config.https_enabled) {
 }
 
 const http = require('http').Server(app)
+const csrfSecret = crypto.randomBytes(32)
+
+const csrfTokenImpl = {
+  create() {
+    const salt = crypto.randomBytes(16).toString('hex')
+    const digest = crypto.createHmac('sha256', csrfSecret).update(salt).digest('hex')
+    const token = `${salt}.${digest}`
+
+    return {
+      token,
+      validate(req, value) {
+        if(typeof value !== 'string') {
+          return false
+        }
+
+        const [valueSalt, valueDigest] = value.split('.')
+        if(!valueSalt || !valueDigest) {
+          return false
+        }
+
+        const expected = crypto.createHmac('sha256', csrfSecret).update(valueSalt).digest('hex')
+        const actualBuffer = Buffer.from(valueDigest, 'hex')
+        const expectedBuffer = Buffer.from(expected, 'hex')
+        return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer)
+      }
+    }
+  }
+}
 
 app.use((req, res, next) => {
   // set CSP rules and other headers to every request
@@ -79,6 +109,7 @@ if(config.redirect_http_to_https) {
 app.use(compression())
 app.use(cookieParser())
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }))
+app.use(lusca.csrf({ impl: csrfTokenImpl }))
 app.use('/static', express.static(path.join(__dirname, '../static')))
 app.use(express.static(path.join(__dirname, '../static')))
 app.use(express.static(path.join(__dirname, '../media')))
@@ -88,6 +119,13 @@ if(config.trust_proxy) {
 }
 
 require('./routes')(app, utils)
+
+app.use((err, req, res, next) => {
+  if(err.statusCode === 403 && /^CSRF token/.test(err.message)) {
+    return res.sendStatus(403)
+  }
+  return next(err)
+})
 
 const cacheControl = require('./cache_control.js')
 cacheControl.removeCacheFiles()

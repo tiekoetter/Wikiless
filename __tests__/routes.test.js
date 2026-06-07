@@ -2,6 +2,7 @@ const express = require('express');
 const request = require('supertest');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
+const lusca = require('lusca');
 const crypto = require('crypto');
 
 // Mock config
@@ -27,17 +28,40 @@ const utils = utilsFactory();
 
 const routes = require('../src/routes');
 let app;
+function testCsrfImpl() {
+  const tokens = new Set();
+  return {
+    create() {
+      const token = `csrf-${tokens.size}`;
+      tokens.add(token);
+      return {
+        token,
+        validate(req, value) {
+          return tokens.has(value);
+        },
+      };
+    },
+  };
+}
+
+async function csrfRequest(path = '/preferences') {
+  const res = await request(app).get(path);
+  const token = res.text.match(/name="_csrf" value="([^"]+)"/)[1];
+  return { token };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   utils.handleWikiPage.mockImplementation((req, res, prefix) => res.status(200).send(`HANDLED_${prefix}`));
   utils.proxyMedia.mockImplementation(async () => ({ success: true, path: 'DUMMY_PATH' }));
-  utils.preferencesPage.mockImplementation(() => '<html>PREFERENCES</html>');
+  utils.preferencesPage.mockImplementation((req) => `<html>PREFERENCES<input type="hidden" name="_csrf" value="${req.csrfToken()}"></html>`);
   utils.customLogos.mockImplementation(() => false);
   utils.wikilessLogo.mockImplementation(() => 'LOGO_PATH');
   utils.wikilessFavicon.mockImplementation(() => 'FAVICON_PATH');
   app = express();
   app.use(cookieParser());
   app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(lusca.csrf({ impl: testCsrfImpl() }));
 
   // Stub sendFile to avoid FS I/O
   app.use((req, res, next) => {
@@ -47,6 +71,13 @@ beforeEach(() => {
   });
 
   routes(app, utils);
+
+  app.use((err, req, res, next) => {
+    if(err.statusCode === 403 && /^CSRF token/.test(err.message)) {
+      return res.sendStatus(403);
+    }
+    return next(err);
+  });
 });
 
 describe('Routes wiring', () => {
@@ -163,9 +194,10 @@ describe('Routes wiring', () => {
   });
 
   it('POST /preferences -> set cookies + redirect', async () => {
+    const csrf = await csrfRequest();
     const res = await request(app)
       .post('/preferences?back=/xyz')
-      .send('theme=dark&default_lang=fr');
+      .send(`theme=dark&default_lang=fr&_csrf=${csrf.token}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/xyz');
     const ck = res.headers['set-cookie'].join(' ');
@@ -174,25 +206,28 @@ describe('Routes wiring', () => {
   });
 
   it('POST /preferences accepts encoded safe redirect paths', async () => {
+    const csrf = await csrfRequest();
     const res = await request(app)
       .post('/preferences?back=%2Fxyz')
-      .send('theme=dark&default_lang=fr');
+      .send(`theme=dark&default_lang=fr&_csrf=${csrf.token}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/xyz');
   });
 
   it('POST /preferences preserves safe redirect query strings', async () => {
+    const csrf = await csrfRequest();
     const res = await request(app)
       .post('/preferences?back=%2Fwiki%2FFoo%3Flang%3Dfr%23History')
-      .send('theme=dark&default_lang=fr');
+      .send(`theme=dark&default_lang=fr&_csrf=${csrf.token}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/wiki/Foo?lang=fr#History');
   });
 
   it('POST /preferences rejects unsafe redirect paths', async () => {
+    const csrf = await csrfRequest();
     const res = await request(app)
       .post('/preferences?back=//evil.test')
-      .send('theme=dark&default_lang=fr');
+      .send(`theme=dark&default_lang=fr&_csrf=${csrf.token}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/');
   });
@@ -204,9 +239,10 @@ describe('Routes wiring', () => {
     '%2F%5Cevil.test',
     'javascript:alert(1)',
   ])('POST /preferences rejects unsafe redirect target %s', async (back) => {
+    const csrf = await csrfRequest();
     const res = await request(app)
       .post(`/preferences?back=${back}`)
-      .send('theme=dark&default_lang=fr');
+      .send(`theme=dark&default_lang=fr&_csrf=${csrf.token}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/');
   });
@@ -214,7 +250,8 @@ describe('Routes wiring', () => {
   it('GET /preferences -> render preferences page', async () => {
     const res = await request(app).get('/preferences');
     expect(res.status).toBe(200);
-    expect(res.text).toBe('<html>PREFERENCES</html>');
+    expect(res.text).toContain('<html>PREFERENCES');
+    expect(res.text).toContain('name="_csrf"');
     expect(utils.preferencesPage).toHaveBeenCalled();
   });
 
@@ -284,15 +321,19 @@ describe('Routes wiring', () => {
   });
 
   it('POST DownloadAsPdf without page redirects home', async () => {
-    const res = await request(app).post('/wiki/Special:DownloadAsPdf').send('');
+    const csrf = await csrfRequest();
+    const res = await request(app)
+      .post('/wiki/Special:DownloadAsPdf')
+      .send(`_csrf=${csrf.token}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/');
   });
 
   it('POST DownloadAsPdf redirects to the PDF workflow', async () => {
+    const csrf = await csrfRequest();
     const res = await request(app)
       .post('/wiki/Special:DownloadAsPdf')
-      .send('page=Foo&lang=fr');
+      .send(`page=Foo&lang=fr&_csrf=${csrf.token}`);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/w/index.php?title=Special%3ADownloadAsPdf&page=Foo&action=redirect-to-electron&lang=fr');
   });
