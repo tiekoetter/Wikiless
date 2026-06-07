@@ -4,6 +4,7 @@ module.exports = function(redis, gotClient = null) {
   const fs = require('fs').promises
   const { createWriteStream } = require('fs')
   const path = require('path')
+  const crypto = require('crypto')
   const stream = require('stream')
   const { promisify } = require('util')
   const pipeline = promisify(stream.pipeline)
@@ -21,20 +22,159 @@ module.exports = function(redis, gotClient = null) {
   }
 
   function mediaFetchUrlForUrl(url, mediaFilePath) {
+    const search = url.search || ''
     if(url.hostname === 'maps.wikimedia.org') {
-      return `https://maps.wikimedia.org${mediaFilePath.urlPath}`
+      return `https://maps.wikimedia.org${mediaFilePath.urlPath}${search}`
     }
     if(url.hostname === 'wikimedia.org') {
-      return `https://wikimedia.org/api${mediaFilePath.urlPath}`
+      return `https://wikimedia.org/api${mediaFilePath.urlPath}${search}`
     }
     if(url.hostname.endsWith('.wikipedia.org')) {
       const lang = encodeURIComponent(url.hostname.slice(0, -'.wikipedia.org'.length))
-      return `https://${lang}.wikipedia.org${mediaFilePath.urlPath.replace(/^\/api\/[^/]+/, '')}`
+      return `https://${lang}.wikipedia.org${mediaFilePath.urlPath.replace(/^\/api\/[^/]+/, '')}${search}`
     }
-    return `https://upload.wikimedia.org${mediaFilePath.urlPath}`
+    return `https://upload.wikimedia.org${mediaFilePath.urlPath}${search}`
   }
 
-  function normalizeMediaPathFromRequest(rawPath) {
+  function mediaCachePathForUrl(url, filePath) {
+    if(!url.search) {
+      return filePath
+    }
+
+    const queryHash = crypto.createHash('sha256').update(url.search).digest('hex').slice(0, 16)
+    const parsed = path.posix.parse(filePath)
+    const filename = `${parsed.name}.${queryHash}${parsed.ext}`
+    return path.posix.join(parsed.dir, filename)
+  }
+
+  function mediaRequestPath(req) {
+    try {
+      return new URL(req.url, 'https://wikiless.local').pathname
+    } catch(err) {
+      return req.url.split('?')[0]
+    }
+  }
+
+  function mediaRequestSearch(req) {
+    try {
+      return new URL(req.url, 'https://wikiless.local').search
+    } catch(err) {
+      const params = new URLSearchParams(req.query).toString()
+      return params ? `?${params}` : ''
+    }
+  }
+
+  function wikipediaContextFromMapsUrl(url) {
+    const domain = url.searchParams.get('domain')
+    const title = url.searchParams.get('title')
+    if(!domain || !title) {
+      return null
+    }
+
+    let domainUrl
+    try {
+      domainUrl = new URL(`https://${domain}`)
+    } catch(err) {
+      return null
+    }
+
+    const wikipediaSuffix = '.wikipedia.org'
+    if(!domainUrl.hostname.endsWith(wikipediaSuffix) || !this.validLang(domainUrl.hostname.slice(0, -wikipediaSuffix.length))) {
+      return null
+    }
+
+    const origin = `https://${domainUrl.hostname}`
+    const referer = new URL(`/wiki/${encodeURIComponent(title)}`, origin)
+    const revid = url.searchParams.get('revid')
+    if(revid && /^\d+$/.test(revid)) {
+      referer.searchParams.set('oldid', revid)
+    }
+
+    return { origin, referer: referer.href }
+  }
+
+  function wikipediaContextFromRequest(req) {
+    if(!req) {
+      return null
+    }
+
+    const refererHeader = req.headers?.referer || req.headers?.referrer
+    if(!refererHeader) {
+      return null
+    }
+
+    let referer
+    let wikilessOrigin
+    try {
+      wikilessOrigin = new URL(`${global.protocol || 'https://'}${config.domain}`)
+      referer = new URL(refererHeader, wikilessOrigin)
+    } catch(err) {
+      return null
+    }
+
+    if(referer.hostname !== wikilessOrigin.hostname || !referer.pathname.startsWith('/wiki/')) {
+      return null
+    }
+
+    let lang = referer.searchParams.get('lang') || req.query?.lang || req.cookies?.default_lang || config.default_lang
+    lang = this.mapToWikiSubdomain(lang)
+    if(!this.validLang(lang)) {
+      return null
+    }
+
+    const origin = `https://${lang}.wikipedia.org`
+    const wikipediaReferer = new URL(referer.pathname, origin)
+    const oldid = referer.searchParams.get('oldid')
+    if(oldid && /^\d+$/.test(oldid)) {
+      wikipediaReferer.searchParams.set('oldid', oldid)
+    }
+
+    return { origin, referer: wikipediaReferer.href }
+  }
+
+  function wikipediaContextFromTargetUrl(url) {
+    const wikipediaSuffix = '.wikipedia.org'
+    if(url.hostname.endsWith(wikipediaSuffix) && this.validLang(url.hostname.slice(0, -wikipediaSuffix.length))) {
+      const origin = `https://${url.hostname}`
+      const referer = new URL(url.pathname.replace(/^\/api\/rest_v1\/page\/pdf\//, '/wiki/'), origin)
+      return { origin, referer: referer.href }
+    }
+
+    const lang = this.mapToWikiSubdomain(config.default_lang)
+    if(this.validLang(lang)) {
+      const origin = `https://${lang}.wikipedia.org`
+      return { origin, referer: `${origin}/` }
+    }
+
+    return null
+  }
+
+  function mediaRequestHeaders(url, req = null) {
+    const headers = { 'User-Agent': config.wikimedia_useragent }
+    const context =
+      (url.hostname === 'maps.wikimedia.org' ? wikipediaContextFromMapsUrl.call(this, url) : null) ||
+      wikipediaContextFromRequest.call(this, req) ||
+      wikipediaContextFromTargetUrl.call(this, url)
+
+    if(context) {
+      headers.Referer = context.referer
+      headers.Origin = context.origin
+    }
+
+    return headers
+  }
+
+  function encodeMediaPathSegment(decoded) {
+    return encodeURIComponent(decoded)
+  }
+
+  function encodeMapPathSegment(decoded) {
+    return encodeURIComponent(decoded)
+      .replace(/%2C/gi, ',')
+      .replace(/%40/gi, '@')
+  }
+
+  function normalizeMediaPathFromRequest(rawPath, encodeSegment = encodeMediaPathSegment) {
     if(typeof rawPath !== 'string' || !rawPath.startsWith('/') || rawPath.includes('\0') || rawPath.includes('\\')) {
       return null
     }
@@ -54,7 +194,7 @@ module.exports = function(redis, gotClient = null) {
         return null
       }
       decodedSegments.push(decoded)
-      encodedSegments.push(encodeURIComponent(decoded))
+      encodedSegments.push(encodeSegment(decoded))
     }
 
     return {
@@ -289,10 +429,11 @@ module.exports = function(redis, gotClient = null) {
   }
 
   this.proxyMedia = async (req, wiki_domain='') => {
-    let params = new URLSearchParams(req.query).toString() || ''
-
-    if(params) {
-      params = '?' + params
+    const requestPath = mediaRequestPath(req)
+    let params = mediaRequestSearch(req)
+    if(!params) {
+      const queryParams = new URLSearchParams(req.query).toString()
+      params = queryParams ? `?${queryParams}` : ''
     }
 
     let path = ''
@@ -300,10 +441,10 @@ module.exports = function(redis, gotClient = null) {
     let wikimedia_path = ''
     switch (wiki_domain) {
       case 'maps.wikimedia.org':
-        path = normalizeMediaPathFromRequest(req.url.split('/media/maps_wikimedia_org')[1])
+        path = normalizeMediaPathFromRequest(requestPath.split('/media/maps_wikimedia_org')[1], encodeMapPathSegment)
         if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = 'maps.wikimedia.org'
-        wikimedia_path = path.urlPath
+        wikimedia_path = path.urlPath + params
         path = path.filePath
         break;
       case '/api/rest_v1/page/pdf':
@@ -315,20 +456,20 @@ module.exports = function(redis, gotClient = null) {
         path = pdfPath.filePath
         break;
       case 'wikimedia.org/api/rest_v1/media':
-        path = normalizeMediaPathFromRequest(req.url.split('/media/api')[1])
+        path = normalizeMediaPathFromRequest(requestPath.split('/media/api')[1])
         if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = 'wikimedia.org'
-        wikimedia_path = `/api${path.urlPath}`
+        wikimedia_path = `/api${path.urlPath}${params}`
         path = path.filePath
         break;
       default:
-        path = normalizeMediaPathFromRequest(req.url.split('/media')[1])
+        path = normalizeMediaPathFromRequest(requestPath.split('/media')[1])
         if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         wikimedia_path = path.urlPath + params
         path = path.filePath
     }
     const url = new URL(`https://${domain}${wikimedia_path}`)
-    const file = await this.saveFile(url, path)
+    const file = await this.saveFile(url, path, req)
 
     if(file.success === true) {
       return { success: true, path: file.path }
@@ -336,19 +477,23 @@ module.exports = function(redis, gotClient = null) {
     return { success: false, reason: file.reason }
   }
 
-  this.saveFile = async (url, file_path) => {
+  this.saveFile = async (url, file_path, req = null) => {
     if(!this.validMediaUrl(url)) {
       return { success: false, reason: 'INVALID_MEDIA_URL' }
     }
 
     const media_path = mediaRootForUrl(url)
-    const mediaFilePath = normalizeMediaPathFromRequest(file_path)
-    if(!mediaFilePath) {
+    const fetchMediaFilePath = normalizeMediaPathFromRequest(
+      file_path,
+      url.hostname === 'maps.wikimedia.org' ? encodeMapPathSegment : encodeMediaPathSegment
+    )
+    const cacheMediaFilePath = normalizeMediaPathFromRequest(mediaCachePathForUrl(url, file_path))
+    if(!fetchMediaFilePath || !cacheMediaFilePath) {
       return { success: false, reason: 'INVALID_MEDIA_PATH' }
     }
-    const fetch_url = mediaFetchUrlForUrl(url, mediaFilePath)
+    const fetch_url = mediaFetchUrlForUrl(url, fetchMediaFilePath)
 
-    const relativePath = mediaFilePath.filePath.replace(/^[/\\]+/, '')
+    const relativePath = cacheMediaFilePath.filePath.replace(/^[/\\]+/, '')
     const path_with_filename = path.resolve(media_path, relativePath)
     const relative = path.relative(media_path, path_with_filename)
     if(relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
@@ -356,9 +501,7 @@ module.exports = function(redis, gotClient = null) {
     }
     const path_without_filename = path.dirname(path_with_filename)
     const temp_path = `${path_with_filename}.download`
-    const options = {
-      headers: { 'User-Agent': config.wikimedia_useragent }
-    }
+    const options = { headers: mediaRequestHeaders.call(this, url, req) }
 
     try {
       const stats = await fs.stat(path_with_filename)

@@ -27,6 +27,7 @@ describe('Utils factory', () => {
 
   afterEach(async () => {
     await fs.rm(path.join(__dirname, '../media/__test__'), { recursive: true, force: true });
+    await fs.rm(path.join(__dirname, '../media/maps_wikimedia_org/__test__'), { recursive: true, force: true });
     await fs.rm(path.join(__dirname, '../media/api/fr/api/rest_v1/page/pdf/Foo'), { force: true });
   });
 
@@ -183,8 +184,13 @@ describe('Utils factory', () => {
     });
 
     await utils.proxyMedia({
-      url: '/media/maps_wikimedia_org/osm-intl/a.png',
-      query: {},
+      url: '/media/maps_wikimedia_org/img/osm-intl,10,a,a,270x200@2x.png?lang=en&domain=en.wikipedia.org&title=Wedding_of_Prince_William_and_Catherine_Middleton&revid=1355840665',
+      query: {
+        lang: 'en',
+        domain: 'en.wikipedia.org',
+        title: 'Wedding_of_Prince_William_and_Catherine_Middleton',
+        revid: '1355840665',
+      },
       cookies: {},
       params: {},
     }, 'maps.wikimedia.org');
@@ -203,12 +209,15 @@ describe('Utils factory', () => {
       params: { page: 'Foo' },
     }, '/api/rest_v1/page/pdf');
 
-    expect(utils.saveFile.mock.calls[1][0].href).toBe('https://maps.wikimedia.org/osm-intl/a.png');
-    expect(utils.saveFile.mock.calls[1][1]).toBe('/osm-intl/a.png');
+    expect(utils.saveFile.mock.calls[1][0].href).toBe('https://maps.wikimedia.org/img/osm-intl,10,a,a,270x200@2x.png?lang=en&domain=en.wikipedia.org&title=Wedding_of_Prince_William_and_Catherine_Middleton&revid=1355840665');
+    expect(utils.saveFile.mock.calls[1][1]).toBe('/img/osm-intl,10,a,a,270x200@2x.png');
+    expect(utils.saveFile.mock.calls[1][2]).toEqual(expect.objectContaining({ url: expect.stringContaining('/media/maps_wikimedia_org/') }));
     expect(utils.saveFile.mock.calls[2][0].href).toBe('https://wikimedia.org/api/rest_v1/media/math/render/svg/abc');
     expect(utils.saveFile.mock.calls[2][1]).toBe('/rest_v1/media/math/render/svg/abc');
+    expect(utils.saveFile.mock.calls[2][2]).toEqual(expect.objectContaining({ url: '/media/api/rest_v1/media/math/render/svg/abc' }));
     expect(utils.saveFile.mock.calls[3][0].href).toBe('https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo');
     expect(utils.saveFile.mock.calls[3][1]).toBe('/api/fr/api/rest_v1/page/pdf/Foo');
+    expect(utils.saveFile.mock.calls[3][2]).toEqual(expect.objectContaining({ url: '/api/rest_v1/page/pdf/Foo' }));
   });
 
   test('proxyMedia() preserves encoded Wikimedia thumbnail paths', async () => {
@@ -224,7 +233,8 @@ describe('Utils factory', () => {
 
     expect(utils.saveFile).toHaveBeenCalledWith(
       new URL('https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg/500px-Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg'),
-      '/wikipedia/commons/thumb/9/9e/Santa_María_Catedral_-_Chiclayo.jpg/500px-Santa_María_Catedral_-_Chiclayo.jpg'
+      '/wikipedia/commons/thumb/9/9e/Santa_María_Catedral_-_Chiclayo.jpg/500px-Santa_María_Catedral_-_Chiclayo.jpg',
+      expect.objectContaining({ url: encodedPath })
     );
   });
 
@@ -262,7 +272,13 @@ describe('Utils factory', () => {
     expect(result).toEqual({ success: true, path: savedPath });
     expect(mockGotStream).toHaveBeenCalledWith(
       'https://upload.wikimedia.org/__test__/Santa_Mar%C3%ADa_Catedral.jpg',
-      { headers: { 'User-Agent': 'test-agent' } }
+      {
+        headers: {
+          'User-Agent': 'test-agent',
+          Referer: 'https://en.wikipedia.org/',
+          Origin: 'https://en.wikipedia.org',
+        },
+      }
     );
     await expect(fs.readFile(savedPath, 'utf8')).resolves.toBe('image-bytes');
     await expect(fs.stat(`${savedPath}.download`)).rejects.toMatchObject({ code: 'ENOENT' });
@@ -278,8 +294,60 @@ describe('Utils factory', () => {
 
     expect(mockGotStream).toHaveBeenCalledWith(
       'https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo',
-      { headers: { 'User-Agent': 'test-agent' } }
+      {
+        headers: {
+          'User-Agent': 'test-agent',
+          Referer: 'https://fr.wikipedia.org/wiki/Foo',
+          Origin: 'https://fr.wikipedia.org',
+        },
+      }
     );
+  });
+
+  test('saveFile() maps a Wikiless page referer back to Wikipedia for media requests', async () => {
+    await utils.saveFile(
+      new URL('https://upload.wikimedia.org/__test__/from-page.jpg'),
+      '/__test__/from-page.jpg',
+      {
+        url: '/media/__test__/from-page.jpg',
+        query: {},
+        cookies: {},
+        headers: {
+          referer: 'https://test.example.org/wiki/École?lang=fr&oldid=123',
+        },
+      }
+    );
+
+    expect(mockGotStream).toHaveBeenCalledWith(
+      'https://upload.wikimedia.org/__test__/from-page.jpg',
+      {
+        headers: {
+          'User-Agent': 'test-agent',
+          Referer: 'https://fr.wikipedia.org/wiki/%C3%89cole?oldid=123',
+          Origin: 'https://fr.wikipedia.org',
+        },
+      }
+    );
+  });
+
+  test('saveFile() preserves map query parameters and sends Wikimedia context headers', async () => {
+    const result = await utils.saveFile(
+      new URL('https://maps.wikimedia.org/__test__/osm-intl,10,a,a,270x200@2x.png?lang=en&domain=en.wikipedia.org&title=Wedding_of_Prince_William_and_Catherine_Middleton&revid=1355840665'),
+      '/__test__/osm-intl,10,a,a,270x200@2x.png'
+    );
+
+    expect(mockGotStream).toHaveBeenCalledWith(
+      'https://maps.wikimedia.org/__test__/osm-intl,10,a,a,270x200@2x.png?lang=en&domain=en.wikipedia.org&title=Wedding_of_Prince_William_and_Catherine_Middleton&revid=1355840665',
+      {
+        headers: {
+          'User-Agent': 'test-agent',
+          Referer: 'https://en.wikipedia.org/wiki/Wedding_of_Prince_William_and_Catherine_Middleton?oldid=1355840665',
+          Origin: 'https://en.wikipedia.org',
+        },
+      }
+    );
+    expect(result.success).toBe(true);
+    expect(result.path).toMatch(/media\/maps_wikimedia_org\/__test__\/osm-intl,10,a,a,270x200@2x\.[0-9a-f]{16}\.png$/);
   });
 
   test('saveFile() rejects path traversal and malformed encoded paths', async () => {
