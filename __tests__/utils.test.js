@@ -5,21 +5,29 @@ jest.mock('../wikiless.config', () => ({
   setexs: { wikipage: 3600 },
 }));
 
+const fs = require('fs').promises;
 const path = require('path');
+const { Readable } = require('stream');
 const Utils = require('../src/utils.js');
 
 describe('Utils factory', () => {
-  let fakeRedis, utils;
+  let fakeRedis, mockGotStream, utils;
 
   beforeEach(() => {
+    mockGotStream = jest.fn(() => Readable.from(['image-bytes']));
     fakeRedis = {
       get:    jest.fn().mockResolvedValue(null),
       setEx:  jest.fn().mockResolvedValue('OK'),
       isOpen: false,
       connect: jest.fn().mockResolvedValue(),
     };
-    utils = new Utils(fakeRedis);
+    utils = new Utils(fakeRedis, { stream: (...args) => mockGotStream(...args) });
     global.protocol = 'https://';
+  });
+
+  afterEach(async () => {
+    await fs.rm(path.join(__dirname, '../media/__test__'), { recursive: true, force: true });
+    await fs.rm(path.join(__dirname, '../media/api/fr/api/rest_v1/page/pdf/Foo'), { force: true });
   });
 
   function createResponse() {
@@ -203,6 +211,23 @@ describe('Utils factory', () => {
     expect(utils.saveFile.mock.calls[3][1]).toBe('/api/fr/api/rest_v1/page/pdf/Foo');
   });
 
+  test('proxyMedia() preserves encoded Wikimedia thumbnail paths', async () => {
+    utils.saveFile = jest.fn(async (url, filePath) => ({ success: true, path: `SAVED:${filePath}:${url.href}` }));
+    const encodedPath = '/media/wikipedia/commons/thumb/9/9e/Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg/500px-Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg';
+
+    await utils.proxyMedia({
+      url: encodedPath,
+      query: {},
+      cookies: {},
+      params: {},
+    });
+
+    expect(utils.saveFile).toHaveBeenCalledWith(
+      new URL('https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg/500px-Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg'),
+      '/wikipedia/commons/thumb/9/9e/Santa_María_Catedral_-_Chiclayo.jpg/500px-Santa_María_Catedral_-_Chiclayo.jpg'
+    );
+  });
+
   test('proxyMedia() forwards save failures', async () => {
     utils.saveFile = jest.fn(async () => ({ success: false, reason: 'SAVEFILE_ERROR' }));
     await expect(utils.proxyMedia({
@@ -211,6 +236,96 @@ describe('Utils factory', () => {
       cookies: {},
       params: {},
     })).resolves.toEqual({ success: false, reason: 'SAVEFILE_ERROR' });
+  });
+
+  test('validMediaUrl() only accepts expected Wikimedia media hosts', () => {
+    expect(utils.validMediaUrl(new URL('https://upload.wikimedia.org/wikipedia/commons/Foo.png'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('https://maps.wikimedia.org/osm-intl/Foo.png'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('https://wikimedia.org/api/rest_v1/media/Foo'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('http://upload.wikimedia.org/wikipedia/commons/Foo.png'))).toBe(false);
+    expect(utils.validMediaUrl(new URL('https://example.org/wikipedia/commons/Foo.png'))).toBe(false);
+    expect(utils.validMediaUrl(new URL('https://not-a-lang.wikipedia.org/api/rest_v1/page/pdf/Foo'))).toBe(false);
+  });
+
+  test('saveFile() retries and replaces zero-byte cached media files', async () => {
+    const filePath = '/__test__/Santa_Mar%C3%ADa_Catedral.jpg';
+    const savedPath = path.join(__dirname, '../media/__test__/Santa_María_Catedral.jpg');
+    await fs.mkdir(path.dirname(savedPath), { recursive: true });
+    await fs.writeFile(savedPath, '');
+
+    const result = await utils.saveFile(
+      new URL('https://upload.wikimedia.org/__test__/Santa_Mar%C3%ADa_Catedral.jpg'),
+      filePath
+    );
+
+    expect(result).toEqual({ success: true, path: savedPath });
+    expect(mockGotStream).toHaveBeenCalledWith(
+      'https://upload.wikimedia.org/__test__/Santa_Mar%C3%ADa_Catedral.jpg',
+      { headers: { 'User-Agent': 'test-agent' } }
+    );
+    await expect(fs.readFile(savedPath, 'utf8')).resolves.toBe('image-bytes');
+    await expect(fs.stat(`${savedPath}.download`)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('saveFile() streams from generated allow-listed upstream URLs', async () => {
+    const pdfPath = '/api/fr/api/rest_v1/page/pdf/Foo';
+    await fs.rm(path.join(__dirname, '../media/api/fr/api/rest_v1/page/pdf/Foo'), { force: true });
+    await utils.saveFile(
+      new URL('https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo'),
+      pdfPath
+    );
+
+    expect(mockGotStream).toHaveBeenCalledWith(
+      'https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo',
+      { headers: { 'User-Agent': 'test-agent' } }
+    );
+  });
+
+  test('saveFile() rejects path traversal and malformed encoded paths', async () => {
+    await expect(utils.saveFile(
+      new URL('https://upload.wikimedia.org/wikipedia/commons/Foo.png'),
+      '/../wikiless.config'
+    )).resolves.toEqual({ success: false, reason: 'INVALID_MEDIA_PATH' });
+
+    await expect(utils.saveFile(
+      new URL('https://upload.wikimedia.org/wikipedia/commons/Foo.png'),
+      '/%E0%A4%A'
+    )).resolves.toEqual({ success: false, reason: 'INVALID_MEDIA_PATH' });
+
+    expect(mockGotStream).not.toHaveBeenCalled();
+  });
+
+  test('saveFile() rejects unexpected upstream media hosts before streaming', async () => {
+    await expect(utils.saveFile(
+      new URL('https://example.org/wikipedia/commons/Foo.png'),
+      '/wikipedia/commons/Foo.png'
+    )).resolves.toEqual({ success: false, reason: 'INVALID_MEDIA_URL' });
+
+    expect(mockGotStream).not.toHaveBeenCalled();
+  });
+
+  test('saveFile() removes incomplete temp files when downloads fail', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockGotStream = jest.fn(() => {
+      const stream = new Readable({
+        read() {
+          this.destroy(new Error('download failed'));
+        },
+      });
+      return stream;
+    });
+    const filePath = '/__test__/broken.jpg';
+    const savedPath = path.join(__dirname, '../media/__test__/broken.jpg');
+
+    await expect(utils.saveFile(
+      new URL('https://upload.wikimedia.org/__test__/broken.jpg'),
+      filePath
+    )).resolves.toEqual({ success: false, reason: 'SAVEFILE_ERROR' });
+
+    await expect(fs.stat(savedPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(fs.stat(`${savedPath}.download`)).rejects.toMatchObject({ code: 'ENOENT' });
+    logSpy.mockRestore();
   });
 
   test('customLogos() returns localized logo paths only for valid languages', () => {

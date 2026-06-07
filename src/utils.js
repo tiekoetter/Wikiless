@@ -1,14 +1,82 @@
-module.exports = function(redis) {
+module.exports = function(redis, gotClient = null) {
   const config = require('../wikiless.config')
   const parser = require('node-html-parser')
   const fs = require('fs').promises
-  const { createWriteStream, existsSync } = require('fs')
+  const { createWriteStream } = require('fs')
   const path = require('path')
   const stream = require('stream')
   const { promisify } = require('util')
   const pipeline = promisify(stream.pipeline)
 
-  let _got;
+  let _got = gotClient;
+
+  function mediaRootForUrl(url) {
+    if(url.hostname === 'maps.wikimedia.org') {
+      return path.resolve(__dirname, '../media/maps_wikimedia_org')
+    }
+    if(url.hostname === 'wikimedia.org' && url.pathname.startsWith('/api/')) {
+      return path.resolve(__dirname, '../media/api')
+    }
+    return path.resolve(__dirname, '../media')
+  }
+
+  function mediaFetchUrlForUrl(url, mediaFilePath) {
+    if(url.hostname === 'maps.wikimedia.org') {
+      return `https://maps.wikimedia.org${mediaFilePath.urlPath}`
+    }
+    if(url.hostname === 'wikimedia.org') {
+      return `https://wikimedia.org/api${mediaFilePath.urlPath}`
+    }
+    if(url.hostname.endsWith('.wikipedia.org')) {
+      const lang = encodeURIComponent(url.hostname.slice(0, -'.wikipedia.org'.length))
+      return `https://${lang}.wikipedia.org${mediaFilePath.urlPath.replace(/^\/api\/[^/]+/, '')}`
+    }
+    return `https://upload.wikimedia.org${mediaFilePath.urlPath}`
+  }
+
+  function normalizeMediaPathFromRequest(rawPath) {
+    if(typeof rawPath !== 'string' || !rawPath.startsWith('/') || rawPath.includes('\0') || rawPath.includes('\\')) {
+      return null
+    }
+
+    const decodedSegments = []
+    const encodedSegments = []
+    const segments = rawPath.split('/').slice(1)
+    for(let i = 0; i < segments.length; i++) {
+      let decoded
+      try {
+        decoded = decodeURIComponent(segments[i])
+      } catch(err) {
+        return null
+      }
+
+      if(!decoded || decoded === '.' || decoded === '..' || decoded.includes('/') || decoded.includes('\\') || decoded.includes('\0')) {
+        return null
+      }
+      decodedSegments.push(decoded)
+      encodedSegments.push(encodeURIComponent(decoded))
+    }
+
+    return {
+      filePath: `/${decodedSegments.join('/')}`,
+      urlPath: `/${encodedSegments.join('/')}`
+    }
+  }
+
+  this.validMediaUrl = (url) => {
+    if(url.protocol !== 'https:') {
+      return false
+    }
+    if(['upload.wikimedia.org', 'maps.wikimedia.org', 'wikimedia.org'].includes(url.hostname)) {
+      return true
+    }
+    const wikipediaSuffix = '.wikipedia.org'
+    if(url.hostname.endsWith(wikipediaSuffix)) {
+      const lang = url.hostname.slice(0, -wikipediaSuffix.length)
+      return this.validLang(lang)
+    }
+    return false
+  }
 
   this.download = async (url, params = '') => {
     if (!url) return { success: false, reason: 'MISSING_URL' };
@@ -232,24 +300,32 @@ module.exports = function(redis) {
     let wikimedia_path = ''
     switch (wiki_domain) {
       case 'maps.wikimedia.org':
-        path = req.url.split('/media/maps_wikimedia_org')[1]
+        path = normalizeMediaPathFromRequest(req.url.split('/media/maps_wikimedia_org')[1])
+        if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = 'maps.wikimedia.org'
-        wikimedia_path = path
+        wikimedia_path = path.urlPath
+        path = path.filePath
         break;
       case '/api/rest_v1/page/pdf':
         const lang = req.query.lang || req.cookies.default_lang || config.default_lang
+        const pdfPath = normalizeMediaPathFromRequest(`/api/${lang}${wiki_domain}/${req.params.page}`)
+        if(!pdfPath) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = `${lang}.wikipedia.org`
-        wikimedia_path = `/api/rest_v1/page/pdf/${req.params.page}`
-        path = `/api/${lang}${wiki_domain}/${req.params.page}`
+        wikimedia_path = `/api/rest_v1/page/pdf/${encodeURIComponent(req.params.page)}`
+        path = pdfPath.filePath
         break;
       case 'wikimedia.org/api/rest_v1/media':
+        path = normalizeMediaPathFromRequest(req.url.split('/media/api')[1])
+        if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = 'wikimedia.org'
-        wikimedia_path = req.url.replace('/media/api/rest_v1', '/api/rest_v1')
-        path = req.url.split('/media/api')[1]
+        wikimedia_path = `/api${path.urlPath}`
+        path = path.filePath
         break;
       default:
-        path = req.url.split('/media')[1]
-        wikimedia_path = path + params
+        path = normalizeMediaPathFromRequest(req.url.split('/media')[1])
+        if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
+        wikimedia_path = path.urlPath + params
+        path = path.filePath
     }
     const url = new URL(`https://${domain}${wikimedia_path}`)
     const file = await this.saveFile(url, path)
@@ -261,42 +337,68 @@ module.exports = function(redis) {
   }
 
   this.saveFile = async (url, file_path) => {
+    if(!this.validMediaUrl(url)) {
+      return { success: false, reason: 'INVALID_MEDIA_URL' }
+    }
+
+    const media_path = mediaRootForUrl(url)
+    const mediaFilePath = normalizeMediaPathFromRequest(file_path)
+    if(!mediaFilePath) {
+      return { success: false, reason: 'INVALID_MEDIA_PATH' }
+    }
+    const fetch_url = mediaFetchUrlForUrl(url, mediaFilePath)
+
+    const relativePath = mediaFilePath.filePath.replace(/^[/\\]+/, '')
+    const path_with_filename = path.resolve(media_path, relativePath)
+    const relative = path.relative(media_path, path_with_filename)
+    if(relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+      return { success: false, reason: 'INVALID_MEDIA_PATH' }
+    }
+    const path_without_filename = path.dirname(path_with_filename)
+    const temp_path = `${path_with_filename}.download`
+    const options = {
+      headers: { 'User-Agent': config.wikimedia_useragent }
+    }
+
+    try {
+      const stats = await fs.stat(path_with_filename)
+      if(stats.size > 0) {
+        return { success: true, path: path_with_filename }
+      }
+      await fs.unlink(path_with_filename)
+    } catch(err) {
+      if(err.code !== 'ENOENT') {
+        return { success: false, reason: 'STAT_FAILED' }
+      }
+    }
+
     if (!_got) {
       const mod = await import('got');
       _got = mod.default;
     }
 
-    let media_path = ''
-    if(url.href.startsWith('https://maps.wikimedia.org/')) {
-      media_path = path.join(__dirname, '../media/maps_wikimedia_org')
-    } else if(url.href.startsWith('https://wikimedia.org/media/api/')) {
-      media_path = path.join(__dirname, '../media/api')
-    } else {
-      media_path = path.join(__dirname, '../media')
+    try {
+      await fs.mkdir(path_without_filename, { recursive: true })
+    } catch(err) {
+      return { success: false, reason: 'MKDIR_FAILED' }
     }
 
-    const path_with_filename = decodeURI(`${media_path}${file_path}`)
-    const path_without_filename = path.dirname(path_with_filename)
-    const options = {
-      headers: { 'User-Agent': config.wikimedia_useragent }
-    }
-
-    if(!existsSync(path_with_filename)) {
-      try {
-        await fs.mkdir(path_without_filename, { recursive: true })
-      } catch(err) {
-        return { success: false, reason: 'MKDIR_FAILED' }
+    try {
+      await fs.rm(temp_path, { force: true })
+      await pipeline(
+        _got.stream(fetch_url, options),
+        createWriteStream(temp_path)
+      )
+      const stats = await fs.stat(temp_path)
+      if(stats.size === 0) {
+        await fs.rm(temp_path, { force: true })
+        return { success: false, reason: 'SAVEFILE_EMPTY' }
       }
-
-      try {
-        await pipeline(
-          _got.stream(url, options),
-          createWriteStream(path_with_filename)
-        )
-      } catch(err) {
-        console.log(`Error while saving ${path_with_filename}. Details:${err}`)
-        return { success: false, reason: 'SAVEFILE_ERROR' }
-      }
+      await fs.rename(temp_path, path_with_filename)
+    } catch(err) {
+      await fs.rm(temp_path, { force: true }).catch(() => {})
+      console.log(`Error while saving ${path_with_filename}. Details:${err}`)
+      return { success: false, reason: 'SAVEFILE_ERROR' }
     }
 
     return { success: true, path: path_with_filename }
