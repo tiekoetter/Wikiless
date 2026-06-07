@@ -29,6 +29,12 @@ const routes = require('../src/routes');
 let app;
 beforeEach(() => {
   jest.clearAllMocks();
+  utils.handleWikiPage.mockImplementation((req, res, prefix) => res.status(200).send(`HANDLED_${prefix}`));
+  utils.proxyMedia.mockImplementation(async () => ({ success: true, path: 'DUMMY_PATH' }));
+  utils.preferencesPage.mockImplementation(() => '<html>PREFERENCES</html>');
+  utils.customLogos.mockImplementation(() => false);
+  utils.wikilessLogo.mockImplementation(() => 'LOGO_PATH');
+  utils.wikilessFavicon.mockImplementation(() => 'FAVICON_PATH');
   app = express();
   app.use(cookieParser());
   app.use(bodyParser.urlencoded({ extended: true }));
@@ -109,10 +115,22 @@ describe('Routes wiring', () => {
     expect(utils.proxyMedia).toHaveBeenCalledWith(expect.any(Object), 'wikimedia.org/api/rest_v1/media');
   });
 
-  it('GET /media/* returns 404 when proxying fails', async () => {
+  it('GET /media/* returns 502 when upstream fetching fails', async () => {
     utils.proxyMedia.mockResolvedValueOnce({ success: false, reason: 'SAVEFILE_ERROR' });
     const res = await request(app).get('/media/missing.png');
+    expect(res.status).toBe(502);
+  });
+
+  it('GET /media/* returns 404 for invalid media paths', async () => {
+    utils.proxyMedia.mockResolvedValueOnce({ success: false, reason: 'INVALID_MEDIA_PATH' });
+    const res = await request(app).get('/media/invalid.png');
     expect(res.status).toBe(404);
+  });
+
+  it('GET /media/* returns 500 for local cache filesystem failures', async () => {
+    utils.proxyMedia.mockResolvedValueOnce({ success: false, reason: 'MKDIR_FAILED' });
+    const res = await request(app).get('/media/file.png');
+    expect(res.status).toBe(500);
   });
 
   it('GET /w/index.php?search=Foo&lang=de -> redirect', async () => {
@@ -205,10 +223,10 @@ describe('Routes wiring', () => {
     expect(utils.proxyMedia).toHaveBeenCalledWith(expect.any(Object), '/api/rest_v1/page/pdf');
   });
 
-  it('GET /api/rest_v1/page/pdf/:page returns 404 when proxying fails', async () => {
+  it('GET /api/rest_v1/page/pdf/:page returns 502 when proxy fetching fails', async () => {
     utils.proxyMedia.mockResolvedValueOnce({ success: false, reason: 'SAVEFILE_ERROR' });
     const res = await request(app).get('/api/rest_v1/page/pdf/Foo');
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(502);
   });
 
   it('GET /zh* redirects Chinese variants to wiki pages', async () => {
