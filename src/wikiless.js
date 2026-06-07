@@ -79,6 +79,7 @@ if(config.redirect_http_to_https) {
 app.use(compression())
 app.use(cookieParser())
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }))
+app.use('/static', express.static(path.join(__dirname, '../static')))
 app.use(express.static(path.join(__dirname, '../static')))
 app.use(express.static(path.join(__dirname, '../media')))
 
