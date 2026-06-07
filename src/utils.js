@@ -10,11 +10,6 @@ module.exports = function(redis, gotClient = null) {
 
   let _got = gotClient;
 
-  function pathInside(parent, child) {
-    const relative = path.relative(parent, child)
-    return relative === '' || (relative && !relative.startsWith('..') && !path.isAbsolute(relative))
-  }
-
   function mediaRootForUrl(url) {
     if(url.hostname === 'maps.wikimedia.org') {
       return path.resolve(__dirname, '../media/maps_wikimedia_org')
@@ -25,15 +20,33 @@ module.exports = function(redis, gotClient = null) {
     return path.resolve(__dirname, '../media')
   }
 
-  function resolveMediaPath(mediaRoot, filePath) {
-    const decodedPath = decodeURIComponent(filePath)
-    const relativePath = decodedPath.replace(/^[/\\]+/, '')
-    const resolvedPath = path.resolve(mediaRoot, relativePath)
-
-    if(!pathInside(mediaRoot, resolvedPath)) {
+  function normalizeMediaPathFromRequest(rawPath) {
+    if(typeof rawPath !== 'string' || !rawPath.startsWith('/') || rawPath.includes('\0') || rawPath.includes('\\')) {
       return null
     }
-    return resolvedPath
+
+    const decodedSegments = []
+    const encodedSegments = []
+    const segments = rawPath.split('/').slice(1)
+    for(let i = 0; i < segments.length; i++) {
+      let decoded
+      try {
+        decoded = decodeURIComponent(segments[i])
+      } catch(err) {
+        return null
+      }
+
+      if(!decoded || decoded === '.' || decoded === '..' || decoded.includes('/') || decoded.includes('\\') || decoded.includes('\0')) {
+        return null
+      }
+      decodedSegments.push(decoded)
+      encodedSegments.push(encodeURIComponent(decoded))
+    }
+
+    return {
+      filePath: `/${decodedSegments.join('/')}`,
+      urlPath: `/${encodedSegments.join('/')}`
+    }
   }
 
   this.validMediaUrl = (url) => {
@@ -273,24 +286,32 @@ module.exports = function(redis, gotClient = null) {
     let wikimedia_path = ''
     switch (wiki_domain) {
       case 'maps.wikimedia.org':
-        path = req.url.split('/media/maps_wikimedia_org')[1]
+        path = normalizeMediaPathFromRequest(req.url.split('/media/maps_wikimedia_org')[1])
+        if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = 'maps.wikimedia.org'
-        wikimedia_path = path
+        wikimedia_path = path.urlPath
+        path = path.filePath
         break;
       case '/api/rest_v1/page/pdf':
         const lang = req.query.lang || req.cookies.default_lang || config.default_lang
+        const pdfPath = normalizeMediaPathFromRequest(`/api/${lang}${wiki_domain}/${req.params.page}`)
+        if(!pdfPath) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = `${lang}.wikipedia.org`
-        wikimedia_path = `/api/rest_v1/page/pdf/${req.params.page}`
-        path = `/api/${lang}${wiki_domain}/${req.params.page}`
+        wikimedia_path = `/api/rest_v1/page/pdf/${encodeURIComponent(req.params.page)}`
+        path = pdfPath.filePath
         break;
       case 'wikimedia.org/api/rest_v1/media':
+        path = normalizeMediaPathFromRequest(req.url.split('/media/api')[1])
+        if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = 'wikimedia.org'
-        wikimedia_path = req.url.replace('/media/api/rest_v1', '/api/rest_v1')
-        path = req.url.split('/media/api')[1]
+        wikimedia_path = `/api${path.urlPath}`
+        path = path.filePath
         break;
       default:
-        path = req.url.split('/media')[1]
-        wikimedia_path = path + params
+        path = normalizeMediaPathFromRequest(req.url.split('/media')[1])
+        if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
+        wikimedia_path = path.urlPath + params
+        path = path.filePath
     }
     const url = new URL(`https://${domain}${wikimedia_path}`)
     const file = await this.saveFile(url, path)
@@ -307,13 +328,15 @@ module.exports = function(redis, gotClient = null) {
     }
 
     const media_path = mediaRootForUrl(url)
-    let path_with_filename
-    try {
-      path_with_filename = resolveMediaPath(media_path, file_path)
-    } catch(err) {
+    const mediaFilePath = normalizeMediaPathFromRequest(file_path)
+    if(!mediaFilePath) {
       return { success: false, reason: 'INVALID_MEDIA_PATH' }
     }
-    if(!path_with_filename) {
+
+    const relativePath = mediaFilePath.filePath.replace(/^[/\\]+/, '')
+    const path_with_filename = path.resolve(media_path, relativePath)
+    const relative = path.relative(media_path, path_with_filename)
+    if(relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
       return { success: false, reason: 'INVALID_MEDIA_PATH' }
     }
     const path_without_filename = path.dirname(path_with_filename)

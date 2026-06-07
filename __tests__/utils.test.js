@@ -223,7 +223,7 @@ describe('Utils factory', () => {
 
     expect(utils.saveFile).toHaveBeenCalledWith(
       new URL('https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg/500px-Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg'),
-      '/wikipedia/commons/thumb/9/9e/Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg/500px-Santa_Mar%C3%ADa_Catedral_-_Chiclayo.jpg'
+      '/wikipedia/commons/thumb/9/9e/Santa_María_Catedral_-_Chiclayo.jpg/500px-Santa_María_Catedral_-_Chiclayo.jpg'
     );
   });
 
