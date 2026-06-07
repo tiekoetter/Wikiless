@@ -1,14 +1,14 @@
-module.exports = function(redis) {
+module.exports = function(redis, gotClient = null) {
   const config = require('../wikiless.config')
   const parser = require('node-html-parser')
   const fs = require('fs').promises
-  const { createWriteStream, existsSync } = require('fs')
+  const { createWriteStream } = require('fs')
   const path = require('path')
   const stream = require('stream')
   const { promisify } = require('util')
   const pipeline = promisify(stream.pipeline)
 
-  let _got;
+  let _got = gotClient;
 
   this.download = async (url, params = '') => {
     if (!url) return { success: false, reason: 'MISSING_URL' };
@@ -261,11 +261,6 @@ module.exports = function(redis) {
   }
 
   this.saveFile = async (url, file_path) => {
-    if (!_got) {
-      const mod = await import('got');
-      _got = mod.default;
-    }
-
     let media_path = ''
     if(url.href.startsWith('https://maps.wikimedia.org/')) {
       media_path = path.join(__dirname, '../media/maps_wikimedia_org')
@@ -277,26 +272,50 @@ module.exports = function(redis) {
 
     const path_with_filename = decodeURI(`${media_path}${file_path}`)
     const path_without_filename = path.dirname(path_with_filename)
+    const temp_path = `${path_with_filename}.download`
     const options = {
       headers: { 'User-Agent': config.wikimedia_useragent }
     }
 
-    if(!existsSync(path_with_filename)) {
-      try {
-        await fs.mkdir(path_without_filename, { recursive: true })
-      } catch(err) {
-        return { success: false, reason: 'MKDIR_FAILED' }
+    try {
+      const stats = await fs.stat(path_with_filename)
+      if(stats.size > 0) {
+        return { success: true, path: path_with_filename }
       }
+      await fs.unlink(path_with_filename)
+    } catch(err) {
+      if(err.code !== 'ENOENT') {
+        return { success: false, reason: 'STAT_FAILED' }
+      }
+    }
 
-      try {
-        await pipeline(
-          _got.stream(url, options),
-          createWriteStream(path_with_filename)
-        )
-      } catch(err) {
-        console.log(`Error while saving ${path_with_filename}. Details:${err}`)
-        return { success: false, reason: 'SAVEFILE_ERROR' }
+    if (!_got) {
+      const mod = await import('got');
+      _got = mod.default;
+    }
+
+    try {
+      await fs.mkdir(path_without_filename, { recursive: true })
+    } catch(err) {
+      return { success: false, reason: 'MKDIR_FAILED' }
+    }
+
+    try {
+      await fs.rm(temp_path, { force: true })
+      await pipeline(
+        _got.stream(url, options),
+        createWriteStream(temp_path)
+      )
+      const stats = await fs.stat(temp_path)
+      if(stats.size === 0) {
+        await fs.rm(temp_path, { force: true })
+        return { success: false, reason: 'SAVEFILE_EMPTY' }
       }
+      await fs.rename(temp_path, path_with_filename)
+    } catch(err) {
+      await fs.rm(temp_path, { force: true }).catch(() => {})
+      console.log(`Error while saving ${path_with_filename}. Details:${err}`)
+      return { success: false, reason: 'SAVEFILE_ERROR' }
     }
 
     return { success: true, path: path_with_filename }
