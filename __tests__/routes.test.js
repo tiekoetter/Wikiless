@@ -181,9 +181,31 @@ describe('Routes wiring', () => {
     expect(res.headers.location).toBe('/xyz');
   });
 
+  it('POST /preferences preserves safe redirect query strings', async () => {
+    const res = await request(app)
+      .post('/preferences?back=%2Fwiki%2FFoo%3Flang%3Dfr%23History')
+      .send('theme=dark&default_lang=fr');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/wiki/Foo?lang=fr#History');
+  });
+
   it('POST /preferences rejects unsafe redirect paths', async () => {
     const res = await request(app)
       .post('/preferences?back=//evil.test')
+      .send('theme=dark&default_lang=fr');
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/');
+  });
+
+  it.each([
+    'https://evil.test/phish',
+    'https%3A%2F%2Fevil.test%2Fphish',
+    '%2F%2Fevil.test',
+    '%2F%5Cevil.test',
+    'javascript:alert(1)',
+  ])('POST /preferences rejects unsafe redirect target %s', async (back) => {
+    const res = await request(app)
+      .post(`/preferences?back=${back}`)
       .send('theme=dark&default_lang=fr');
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/');

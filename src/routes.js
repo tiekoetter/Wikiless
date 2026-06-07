@@ -204,29 +204,34 @@ module.exports = (app, utils) => {
     return res.send(preferencesPage(req, res))
   })
 
-  // Helper to validate safe redirect paths
-  function isSafeRedirectPath(path) {
-    // Must start with a single slash, not double slash, not contain backslash, not contain protocol
-    return (
-      typeof path === 'string' &&
-      path.startsWith('/') &&
-      !path.startsWith('//') &&
-      !path.includes('\\') &&
-      !/^\/(http|https):/.test(path)
-    );
+  // Helper to sanitize redirect targets to same-origin internal paths.
+  function sanitizeBackRedirect(back) {
+    if (typeof back !== 'string') {
+      return '/'
+    }
+
+    const localOrigin = 'https://wikiless.local'
+    let parsed
+    try {
+      parsed = new URL(back, localOrigin)
+    } catch(err) {
+      return '/'
+    }
+
+    if(parsed.origin !== localOrigin || parsed.pathname.includes('\\')) {
+      return '/'
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
   }
 
   app.post('/preferences', (req, res) => {
     const theme = req.body.theme
     const default_lang = req.body.default_lang
-    let back = req.query.back
+    const back = sanitizeBackRedirect(req.query.back)
 
     res.cookie('theme', theme, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: true })
     res.cookie('default_lang', default_lang, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: true })
-
-    if (!isSafeRedirectPath(back)) {
-      back = '/'
-    }
 
     return res.redirect(back)
   })
