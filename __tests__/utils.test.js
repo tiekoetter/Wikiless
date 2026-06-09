@@ -7,6 +7,18 @@ jest.mock('../wikiless.config', () => ({
   setexs: { wikipage: 3600 },
 }));
 
+jest.mock('http-proxy-agent', () => ({
+  HttpProxyAgent: jest.fn(function HttpProxyAgent(proxy) {
+    this.proxy = proxy;
+  }),
+}));
+
+jest.mock('https-proxy-agent', () => ({
+  HttpsProxyAgent: jest.fn(function HttpsProxyAgent(proxy) {
+    this.proxy = proxy;
+  }),
+}));
+
 const fs = require('fs').promises;
 const path = require('path');
 const { Readable } = require('stream');
