@@ -3,8 +3,6 @@ module.exports = function(redis, gotClient = null) {
   const parser = require('node-html-parser')
   const fs = require('fs').promises
   const { createWriteStream } = require('fs')
-  const { HttpProxyAgent } = require('http-proxy-agent')
-  const { HttpsProxyAgent } = require('https-proxy-agent')
   const path = require('path')
   const crypto = require('crypto')
   const stream = require('stream')
@@ -12,6 +10,7 @@ module.exports = function(redis, gotClient = null) {
   const pipeline = promisify(stream.pipeline)
 
   let _got = gotClient;
+  let proxyAgentsPromise = null;
 
   function mediaRootForUrl(url) {
     if(url.hostname === 'maps.wikimedia.org') {
@@ -195,11 +194,40 @@ module.exports = function(redis, gotClient = null) {
     })
   }
 
-  function gotOptionsForUrl(url, options) {
+  function proxyAgentConstructor(mod, name) {
+    return mod[name] || (mod.default && mod.default[name]) || mod.default
+  }
+
+  function loadProxyAgentModule(name) {
+    try {
+      return Promise.resolve(require(name))
+    } catch(err) {
+      if(err.code !== 'ERR_REQUIRE_ESM') {
+        throw err
+      }
+      return import(name)
+    }
+  }
+
+  async function loadProxyAgents() {
+    if(!proxyAgentsPromise) {
+      proxyAgentsPromise = Promise.all([
+        loadProxyAgentModule('http-proxy-agent'),
+        loadProxyAgentModule('https-proxy-agent')
+      ]).then(([httpProxyAgent, httpsProxyAgent]) => ({
+        HttpProxyAgent: proxyAgentConstructor(httpProxyAgent, 'HttpProxyAgent'),
+        HttpsProxyAgent: proxyAgentConstructor(httpsProxyAgent, 'HttpsProxyAgent')
+      }))
+    }
+    return proxyAgentsPromise
+  }
+
+  async function gotOptionsForUrl(url, options) {
     if(!config.http_proxy || noProxyMatches(url)) {
       return options
     }
 
+    const { HttpProxyAgent, HttpsProxyAgent } = await loadProxyAgents()
     return {
       ...options,
       agent: {
@@ -330,7 +358,7 @@ module.exports = function(redis, gotClient = null) {
     }
   
     try {
-      const { body } = await _got(url, gotOptionsForUrl(u, {
+      const { body } = await _got(url, await gotOptionsForUrl(u, {
         headers: { 'User-Agent': UA },
         timeout: { request: 10000 }
       }));
@@ -579,7 +607,7 @@ module.exports = function(redis, gotClient = null) {
     }
     const path_without_filename = path.dirname(path_with_filename)
     const temp_path = `${path_with_filename}.download`
-    const options = gotOptionsForUrl(url, { headers: mediaRequestHeaders.call(this, url, req) })
+    const options = await gotOptionsForUrl(url, { headers: mediaRequestHeaders.call(this, url, req) })
 
     try {
       const stats = await fs.stat(path_with_filename)
