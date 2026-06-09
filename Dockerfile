@@ -1,12 +1,12 @@
 # For reference to update this file
 #https://hub.docker.com/_/node/
-#https://github.com/GoogleContainerTools/distroless/blob/main/README.md
 
 # Build stage arguments (needed for npm install permissions)
 ARG UID=200003
 ARG GID=200003
 
-FROM node:25.2-alpine3.21 AS build
+# Keep the build and runtime Node majors aligned. Dependabot scans literal FROM tags.
+FROM node:26.3.0-bookworm-slim AS build
 
 ARG UID=200003
 ARG GID=200003
@@ -15,8 +15,8 @@ WORKDIR /wikiless
 COPY . /wikiless
 
 # Create user in build stage for proper permissions
-RUN addgroup -g $GID appgroup && \
-    adduser -u $UID -G appgroup -s /bin/sh -D appuser && \
+RUN groupadd --gid $GID appgroup && \
+    useradd --uid $UID --gid $GID --shell /bin/sh --create-home appuser && \
     chown -R appuser:appgroup /wikiless
 
 USER appuser
@@ -27,7 +27,7 @@ RUN npm ci --only=production --omit=optional && npm cache clean --force
 ARG UID=200003
 ARG GID=200003
 
-FROM gcr.io/distroless/nodejs24-debian12
+FROM node:26.3.0-bookworm-slim
 
 ARG UID=200003
 ARG GID=200003
@@ -42,7 +42,6 @@ COPY --from=build --chown=$UID:$GID /wikiless/src ./src
 COPY --from=build --chown=$UID:$GID /wikiless/media ./media
 COPY --from=build --chown=$UID:$GID /wikiless/static ./static
 
-# Distroless doesn't have useradd, so we directly specify UID
 USER $UID
 
 # Health Monitoring
@@ -51,4 +50,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD ["node", "-e", "require('http').get('http://localhost:8080/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
 
 COPY --from=build --chown=$UID:$GID /wikiless/wikiless.config ./wikiless.config
-CMD ["src/wikiless.js"]
+CMD ["node", "src/wikiless.js"]
