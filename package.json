@@ -10,7 +10,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "got": "^15.0.5",
-    "http-proxy-agent": "^7.0.2",
+    "http-proxy-agent": "^9.1.0",
     "https-proxy-agent": "^7.0.6",
     "lusca": "^1.7.0",
     "node-html-parser": "^7.1.0",
