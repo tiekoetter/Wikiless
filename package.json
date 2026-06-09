@@ -11,7 +11,7 @@
     "express-rate-limit": "^8.5.2",
     "got": "^15.0.5",
     "http-proxy-agent": "^9.1.0",
-    "https-proxy-agent": "^7.0.6",
+    "https-proxy-agent": "^9.1.0",
     "lusca": "^1.7.0",
     "node-html-parser": "^7.1.0",
     "redis": "^6.0.0"
