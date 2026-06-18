@@ -4,7 +4,7 @@
   "description": "A free open source alternative Wikipedia front-end focused on privacy.",
   "main": "src/wikiless.js",
   "dependencies": {
-    "body-parser": "^2.2.2",
+    "body-parser": "^2.3.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
@@ -20,6 +20,10 @@
     "jest": "^30.4.2",
     "redis-mock": "^0.56.3",
     "supertest": "^7.2.2"
+  },
+  "overrides": {
+    "form-data": "^4.0.6",
+    "js-yaml": "^4.2.0"
   },
   "scripts": {
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
