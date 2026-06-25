@@ -6,7 +6,7 @@ ARG UID=200003
 ARG GID=200003
 
 # Keep the build and runtime Node majors aligned. Dependabot scans literal FROM tags.
-FROM node:26.3.1-trixie-slim AS build
+FROM node:26.4.0-trixie-slim AS build
 
 ARG UID=200003
 ARG GID=200003
@@ -27,7 +27,7 @@ RUN npm ci --only=production --omit=optional && npm cache clean --force
 ARG UID=200003
 ARG GID=200003
 
-FROM node:26.3.1-trixie-slim
+FROM node:26.4.0-trixie-slim
 
 ARG UID=200003
 ARG GID=200003
