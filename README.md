@@ -25,6 +25,27 @@ https://github.com/tiekoetter/Wikiless/wiki
 
 Visit ```http://localhost:8180``` in your web browser to use Wikiless locally.
 
+## Proxy configuration
+
+`TRUST_PROXY` configures an inbound reverse proxy such as nginx or Caddy. It is
+enabled by default for compatibility and trusts only `127.0.0.1` unless
+`TRUST_PROXY_ADDRESS` is set. Configure that address to match the immediate
+reverse-proxy hop so Express can identify each visitor correctly for local rate
+limiting. Set `TRUST_PROXY=false` when Wikiless is exposed directly.
+
+`WIKILESS_HTTP_PROXY` configures the outbound forward proxy used when Wikiless
+fetches pages and media from Wikimedia. It does not affect visitor IP detection
+or Wikiless's local rate limiter.
+
+Example for an nginx deployment using an outbound rotating proxy:
+
+```env
+TRUST_PROXY=true
+TRUST_PROXY_ADDRESS=127.0.0.1
+WIKILESS_HTTP_PROXY=http://proxy.example:3128
+WIKILESS_CONTACT_EMAIL=maintainer@example.com
+```
+
 # Contributing
 
 Contributions are welcome! 
