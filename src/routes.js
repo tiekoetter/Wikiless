@@ -19,6 +19,10 @@ module.exports = (app, utils) => {
     legacyHeaders: false
   })
 
+  // Cached media is served by express.static before reaching this router. Only
+  // uncached media downloads should consume the filesystem/upstream allowance.
+  app.get(/^\/media/, filesystemRateLimit)
+
   app.all(/.*/, (req, res, next) => {
     let themeOverride = req.query.theme
     if(themeOverride) {
@@ -41,7 +45,7 @@ module.exports = (app, utils) => {
     return next()
   })
 
-  app.get(/.*/, filesystemRateLimit, async (req, res, next) => {
+  app.get(/.*/, async (req, res, next) => {
     if(req.url.startsWith('/w/load.php')) {
       return res.sendStatus(404)
     }
@@ -68,7 +72,10 @@ module.exports = (app, utils) => {
 
         return res.sendFile(media.path)
       }
-      return res.sendStatus(mediaFailureStatus(media.reason))
+      if(media.retryAfter) {
+        res.setHeader('Retry-After', String(media.retryAfter))
+      }
+      return res.sendStatus(mediaFailureStatus(media.reason, media.statusCode))
     }
 
     if(req.url.startsWith('/static/images/project-logos/') || req.url === '/static/images/mobile/copyright/wikipedia.png' || req.url === '/static/apple-touch/wikipedia.png') {
@@ -108,7 +115,11 @@ module.exports = (app, utils) => {
     return next()
   })
 
-  function mediaFailureStatus(reason) {
+  function mediaFailureStatus(reason, upstreamStatus) {
+    if(upstreamStatus === 429) {
+      return 429
+    }
+
     switch (reason) {
       case 'INVALID_MEDIA_PATH':
       case 'INVALID_MEDIA_URL':
@@ -189,7 +200,10 @@ module.exports = (app, utils) => {
       let filename = `${req.params.page}.pdf`
       return res.download(media.path, filename)
     }
-    return res.sendStatus(mediaFailureStatus(media.reason))
+    if(media.retryAfter) {
+      res.setHeader('Retry-After', String(media.retryAfter))
+    }
+    return res.sendStatus(mediaFailureStatus(media.reason, media.statusCode))
   })
 
   // handle chinese variants

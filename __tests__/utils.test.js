@@ -52,6 +52,7 @@ describe('Utils factory', () => {
     return {
       redirect: jest.fn(),
       send: jest.fn(),
+      setHeader: jest.fn(),
       status: jest.fn(function(code) {
         this.statusCode = code;
         return this;
@@ -99,6 +100,45 @@ describe('Utils factory', () => {
         }),
       })
     );
+  });
+
+  test('download() does not retry upstream requests independently', async () => {
+    const gotClient = jest.fn(async () => ({ body: '<html></html>' }));
+    utils = new Utils(fakeRedis, gotClient);
+
+    await utils.download('https://en.wikipedia.org/wiki/Foo');
+
+    expect(gotClient.mock.calls[0][1]).toEqual(expect.objectContaining({
+      retry: { limit: 0 },
+    }));
+  });
+
+  test('download() honors a shared Wikipedia Retry-After backoff', async () => {
+    const error = new Error('rate limited');
+    error.code = 'ERR_NON_2XX_3XX_RESPONSE';
+    error.response = {
+      statusCode: 429,
+      headers: { 'retry-after': '60', 'content-type': 'text/html' },
+    };
+    const gotClient = jest.fn().mockRejectedValue(error);
+    const logSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    utils = new Utils(fakeRedis, gotClient);
+
+    await expect(utils.download('https://en.wikipedia.org/wiki/Foo')).resolves.toEqual({
+      success: false,
+      reason: 'INVALID_HTTP_RESPONSE: 429',
+      url: undefined,
+      statusCode: 429,
+      retryAfter: 60,
+    });
+    await expect(utils.download('https://en.wikipedia.org/wiki/Bar')).resolves.toEqual({
+      success: false,
+      reason: 'INVALID_HTTP_RESPONSE: 429',
+      statusCode: 429,
+      retryAfter: 60,
+    });
+    expect(gotClient).toHaveBeenCalledTimes(1);
+    logSpy.mockRestore();
   });
 
   test('download() honors NO_PROXY for matching hosts', async () => {
@@ -482,6 +522,39 @@ describe('Utils factory', () => {
     logSpy.mockRestore();
   });
 
+  test('saveFile() preserves upstream media rate limits and starts shared backoff', async () => {
+    const error = new Error('rate limited');
+    error.code = 'ERR_NON_2XX_3XX_RESPONSE';
+    error.response = { statusCode: 429, headers: { 'retry-after': '60' } };
+    mockGotStream = jest.fn(() => {
+      const failingStream = new Readable({ read() {} });
+      process.nextTick(() => failingStream.destroy(error));
+      return failingStream;
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await expect(utils.saveFile(
+      new URL('https://upload.wikimedia.org/__test__/limited.jpg'),
+      '/__test__/limited.jpg'
+    )).resolves.toEqual({
+      success: false,
+      reason: 'INVALID_HTTP_RESPONSE: 429',
+      statusCode: 429,
+      retryAfter: 60,
+    });
+    await expect(utils.saveFile(
+      new URL('https://upload.wikimedia.org/__test__/backoff.jpg'),
+      '/__test__/backoff.jpg'
+    )).resolves.toEqual({
+      success: false,
+      reason: 'INVALID_HTTP_RESPONSE: 429',
+      statusCode: 429,
+      retryAfter: 60,
+    });
+    expect(mockGotStream).toHaveBeenCalledTimes(1);
+    logSpy.mockRestore();
+  });
+
   test('customLogos() returns localized logo paths only for valid languages', () => {
     expect(utils.customLogos('/static/images/mobile/copyright/wikipedia-wordmark-fr.svg', 'fr'))
       .toContain(path.join('static', 'fr', 'wikipedia-wordmark-fr.svg'));
@@ -544,6 +617,25 @@ describe('Utils factory', () => {
     await utils.handleWikiPage(req, res, '/wiki/');
 
     expect(res.redirect).toHaveBeenCalledWith('/wiki/Bar');
+  });
+
+  test('handleWikiPage() preserves upstream failures instead of reporting invalid HTML', async () => {
+    const req = { query: { lang: 'en' }, cookies: {}, headers: {}, params: { page: 'Foo' } };
+    const res = createResponse();
+    utils.download = jest.fn(async () => ({
+      success: false,
+      reason: 'INVALID_HTTP_RESPONSE: 429',
+      statusCode: 429,
+      retryAfter: 45,
+    }));
+    utils.processHtml = jest.fn();
+
+    await utils.handleWikiPage(req, res, '/wiki/');
+
+    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '45');
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.send).toHaveBeenCalledWith('INVALID_HTTP_RESPONSE: 429');
+    expect(utils.processHtml).not.toHaveBeenCalled();
   });
 
   test('handleWikiPage() redirects PDF and unknown redirects safely', async () => {

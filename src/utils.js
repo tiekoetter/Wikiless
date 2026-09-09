@@ -11,6 +11,29 @@ module.exports = function(redis, gotClient = null) {
 
   let _got = gotClient;
   let proxyAgentsPromise = null;
+  let wikipediaBackoffUntil = 0;
+
+  function retryAfterMilliseconds(value, now = Date.now()) {
+    if(value === undefined || value === null || value === '') {
+      return null
+    }
+
+    const seconds = Number(value)
+    if(Number.isFinite(seconds) && seconds >= 0) {
+      return seconds * 1000
+    }
+
+    const date = Date.parse(value)
+    if(Number.isFinite(date)) {
+      return Math.max(0, date - now)
+    }
+
+    return null
+  }
+
+  function backoffSeconds(now = Date.now()) {
+    return Math.max(1, Math.ceil((wikipediaBackoffUntil - now) / 1000))
+  }
 
   function mediaRootForUrl(url) {
     if(url.hostname === 'maps.wikimedia.org') {
@@ -356,21 +379,52 @@ module.exports = function(redis, gotClient = null) {
     } catch (err) {
       console.error('Redis GET error for %s:', url, err);
     }
+
+    if(wikipediaBackoffUntil > Date.now()) {
+      return {
+        success: false,
+        reason: 'INVALID_HTTP_RESPONSE: 429',
+        statusCode: 429,
+        retryAfter: backoffSeconds()
+      }
+    }
   
     try {
       const { body } = await _got(url, await gotOptionsForUrl(u, {
         headers: { 'User-Agent': UA },
-        timeout: { request: 10000 }
+        timeout: { request: 10000 },
+        // A 429 is shared state for this upstream, not a reason for every
+        // incoming request to independently retry it several times.
+        retry: { limit: 0 }
       }));
       console.log('Fetched %s from Wikipedia.', url);
       return { success: true, html: body, processed: false, url };
     } catch (err) {
       const status = err.response?.statusCode ?? 'NO_RESPONSE';
-      console.error('Download error for %s:', url, err.code ?? err.message);
+      const retryAfterHeader = err.response?.headers?.['retry-after']
+      let retryAfter
+
+      if(status === 429) {
+        const now = Date.now()
+        const delay = retryAfterMilliseconds(retryAfterHeader, now) ?? 30_000
+        wikipediaBackoffUntil = Math.max(wikipediaBackoffUntil, now + delay)
+        retryAfter = backoffSeconds(now)
+      }
+
+      console.error(
+        'Download error for %s: status=%s code=%s retry-after=%s content-type=%s',
+        url,
+        status,
+        err.code ?? err.message,
+        retryAfterHeader ?? 'none',
+        err.response?.headers?.['content-type'] ?? 'unknown'
+      );
       return {
         success: false,
         reason: status === 404 ? 'REDIRECT' : `INVALID_HTTP_RESPONSE: ${status}`,
-        url: status === 404 ? 'https://wikipedia.org/' : undefined
+        url: status === 404 ? 'https://wikipedia.org/' : undefined,
+        statusCode: Number.isInteger(status) ? status : undefined,
+        retryAfter
       };
     }
   };
@@ -580,7 +634,7 @@ module.exports = function(redis, gotClient = null) {
     if(file.success === true) {
       return { success: true, path: file.path }
     }
-    return { success: false, reason: file.reason }
+    return file
   }
 
   this.saveFile = async (url, file_path, req = null) => {
@@ -621,6 +675,15 @@ module.exports = function(redis, gotClient = null) {
       }
     }
 
+    if(wikipediaBackoffUntil > Date.now()) {
+      return {
+        success: false,
+        reason: 'INVALID_HTTP_RESPONSE: 429',
+        statusCode: 429,
+        retryAfter: backoffSeconds()
+      }
+    }
+
     if (!_got) {
       const mod = await import('got');
       _got = mod.default;
@@ -646,7 +709,32 @@ module.exports = function(redis, gotClient = null) {
       await fs.rename(temp_path, path_with_filename)
     } catch(err) {
       await fs.rm(temp_path, { force: true }).catch(() => {})
-      console.log(`Error while saving ${path_with_filename}. Details:${err}`)
+      const status = err.response?.statusCode
+      const retryAfterHeader = err.response?.headers?.['retry-after']
+      let retryAfter
+
+      if(status === 429) {
+        const now = Date.now()
+        const delay = retryAfterMilliseconds(retryAfterHeader, now) ?? 30_000
+        wikipediaBackoffUntil = Math.max(wikipediaBackoffUntil, now + delay)
+        retryAfter = backoffSeconds(now)
+      }
+
+      console.log(
+        'Error while saving %s: status=%s code=%s retry-after=%s',
+        path_with_filename,
+        status ?? 'NO_RESPONSE',
+        err.code ?? err.message,
+        retryAfterHeader ?? 'none'
+      )
+      if(status === 429) {
+        return {
+          success: false,
+          reason: 'INVALID_HTTP_RESPONSE: 429',
+          statusCode: 429,
+          retryAfter
+        }
+      }
       return { success: false, reason: 'SAVEFILE_ERROR' }
     }
 
@@ -735,6 +823,14 @@ module.exports = function(redis, gotClient = null) {
         }
         return res.redirect(`/?lang=${lang}`)
       }
+
+      if(result.retryAfter) {
+        res.setHeader('Retry-After', String(result.retryAfter))
+      }
+      const statusCode = Number.isInteger(result.statusCode) && result.statusCode >= 400 && result.statusCode <= 599
+        ? result.statusCode
+        : 502
+      return res.status(statusCode).send(result.reason)
     }
 
     if(result.processed === true) {
