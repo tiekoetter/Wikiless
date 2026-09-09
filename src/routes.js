@@ -54,7 +54,9 @@ module.exports = (app, utils) => {
       let media
       let mime = ''
 
-      if(req.url.startsWith('/media/maps_wikimedia_org/')) {
+      if(req.url.startsWith('/media/thumb_wikimedia_org/')) {
+        media = await proxyMedia(req, 'thumb.wikimedia.org')
+      } else if(req.url.startsWith('/media/maps_wikimedia_org/')) {
         media = await proxyMedia(req, 'maps.wikimedia.org')
       } else if(req.url.startsWith('/media/api/rest_v1/media')) {
         media = await proxyMedia(req, 'wikimedia.org/api/rest_v1/media')

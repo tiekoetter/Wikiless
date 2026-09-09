@@ -156,6 +156,12 @@ describe('Routes wiring', () => {
     expect(utils.proxyMedia).toHaveBeenCalledWith(expect.any(Object), 'maps.wikimedia.org');
   });
 
+  it('GET /media/thumb_wikimedia_org/* proxies Wikimedia thumbnails', async () => {
+    const res = await request(app).get('/media/thumb_wikimedia_org/wikipedia/commons/thumb/Foo.png');
+    expect(res.status).toBe(200);
+    expect(utils.proxyMedia).toHaveBeenCalledWith(expect.any(Object), 'thumb.wikimedia.org');
+  });
+
   it('GET /media/api/rest_v1/media render/svg sets svg content type', async () => {
     const res = await request(app).get('/media/api/rest_v1/media/render/svg/Foo.svg');
     expect(res.status).toBe(200);
