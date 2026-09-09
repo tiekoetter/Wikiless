@@ -169,6 +169,18 @@ describe('Routes wiring', () => {
     expect(res.status).toBe(502);
   });
 
+  it('GET /media/* preserves upstream rate limits', async () => {
+    utils.proxyMedia.mockResolvedValueOnce({
+      success: false,
+      reason: 'INVALID_HTTP_RESPONSE: 429',
+      statusCode: 429,
+      retryAfter: 45,
+    });
+    const res = await request(app).get('/media/limited.png');
+    expect(res.status).toBe(429);
+    expect(res.headers['retry-after']).toBe('45');
+  });
+
   it('GET /media/* returns 404 for invalid media paths', async () => {
     utils.proxyMedia.mockResolvedValueOnce({ success: false, reason: 'INVALID_MEDIA_PATH' });
     const res = await request(app).get('/media/invalid.png');
