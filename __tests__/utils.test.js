@@ -45,6 +45,7 @@ describe('Utils factory', () => {
   afterEach(async () => {
     await fs.rm(path.join(__dirname, '../media/__test__'), { recursive: true, force: true });
     await fs.rm(path.join(__dirname, '../media/maps_wikimedia_org/__test__'), { recursive: true, force: true });
+    await fs.rm(path.join(__dirname, '../media/thumb_wikimedia_org/__test__'), { recursive: true, force: true });
     await fs.rm(path.join(__dirname, '../media/api/fr/api/rest_v1/page/pdf/Foo'), { force: true });
   });
 
@@ -239,6 +240,7 @@ describe('Utils factory', () => {
           '<div id="p-wikibase-otherprojects"></div>',
           '<div id="p-lang"><span class="interlanguage-link"><a href="https://fr.wikipedia.org/wiki/Foo">French</a></span></div>',
           '<img src="//upload.wikimedia.org/wikipedia/commons/Foo.png">',
+          '<img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Foo.svg/40px-Foo.svg.png?utm_source=en.wikipedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail">',
           '<img src="https://maps.wikimedia.org/map.png">',
           '<a href="https://www.wikidata.org/wiki/Q1">Q1</a>',
           '</body></html>',
@@ -259,6 +261,7 @@ describe('Utils factory', () => {
     expect(result.html).not.toContain('p-wikibase-otherprojects');
     expect(result.html).toContain('href="/wiki/Foo?lang=fr"');
     expect(result.html).toContain('src="/media/wikipedia/commons/Foo.png"');
+    expect(result.html).toContain('src="/media/thumb_wikimedia_org/wikipedia/commons/thumb/8/87/Foo.svg/40px-Foo.svg.png?utm_source=en.wikipedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail"');
     expect(result.html).toContain('src="/media/maps_wikimedia_org/map.png"');
     expect(result.html).toContain('href="/wiki/Q1"');
   });
@@ -304,6 +307,17 @@ describe('Utils factory', () => {
     }, 'maps.wikimedia.org');
 
     await utils.proxyMedia({
+      url: '/media/thumb_wikimedia_org/wikipedia/commons/thumb/8/87/Gnome-mime-sound-openclipart.svg/40px-Gnome-mime-sound-openclipart.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail',
+      query: {
+        utm_source: 'en.wikipedia.org',
+        utm_campaign: 'parser',
+        utm_content: 'thumbnail',
+      },
+      cookies: {},
+      params: {},
+    }, 'thumb.wikimedia.org');
+
+    await utils.proxyMedia({
       url: '/media/api/rest_v1/media/math/render/svg/abc',
       query: {},
       cookies: {},
@@ -318,14 +332,17 @@ describe('Utils factory', () => {
     }, '/api/rest_v1/page/pdf');
 
     expect(utils.saveFile.mock.calls[1][0].href).toBe('https://maps.wikimedia.org/img/osm-intl,10,a,a,270x200@2x.png?lang=en&domain=en.wikipedia.org&title=Wedding_of_Prince_William_and_Catherine_Middleton&revid=1355840665');
+    expect(utils.saveFile.mock.calls[2][0].href).toBe('https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Gnome-mime-sound-openclipart.svg/40px-Gnome-mime-sound-openclipart.svg.png');
+    expect(utils.saveFile.mock.calls[2][1]).toBe('/wikipedia/commons/thumb/8/87/Gnome-mime-sound-openclipart.svg/40px-Gnome-mime-sound-openclipart.svg.png');
+    expect(utils.saveFile.mock.calls[2][2]).toEqual(expect.objectContaining({ url: expect.stringContaining('/media/thumb_wikimedia_org/') }));
     expect(utils.saveFile.mock.calls[1][1]).toBe('/img/osm-intl,10,a,a,270x200@2x.png');
     expect(utils.saveFile.mock.calls[1][2]).toEqual(expect.objectContaining({ url: expect.stringContaining('/media/maps_wikimedia_org/') }));
-    expect(utils.saveFile.mock.calls[2][0].href).toBe('https://wikimedia.org/api/rest_v1/media/math/render/svg/abc');
-    expect(utils.saveFile.mock.calls[2][1]).toBe('/rest_v1/media/math/render/svg/abc');
-    expect(utils.saveFile.mock.calls[2][2]).toEqual(expect.objectContaining({ url: '/media/api/rest_v1/media/math/render/svg/abc' }));
-    expect(utils.saveFile.mock.calls[3][0].href).toBe('https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo');
-    expect(utils.saveFile.mock.calls[3][1]).toBe('/api/fr/api/rest_v1/page/pdf/Foo');
-    expect(utils.saveFile.mock.calls[3][2]).toEqual(expect.objectContaining({ url: '/api/rest_v1/page/pdf/Foo' }));
+    expect(utils.saveFile.mock.calls[3][0].href).toBe('https://wikimedia.org/api/rest_v1/media/math/render/svg/abc');
+    expect(utils.saveFile.mock.calls[3][1]).toBe('/rest_v1/media/math/render/svg/abc');
+    expect(utils.saveFile.mock.calls[3][2]).toEqual(expect.objectContaining({ url: '/media/api/rest_v1/media/math/render/svg/abc' }));
+    expect(utils.saveFile.mock.calls[4][0].href).toBe('https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo');
+    expect(utils.saveFile.mock.calls[4][1]).toBe('/api/fr/api/rest_v1/page/pdf/Foo');
+    expect(utils.saveFile.mock.calls[4][2]).toEqual(expect.objectContaining({ url: '/api/rest_v1/page/pdf/Foo' }));
   });
 
   test('proxyMedia() preserves encoded Wikimedia thumbnail paths', async () => {
@@ -358,6 +375,7 @@ describe('Utils factory', () => {
 
   test('validMediaUrl() only accepts expected Wikimedia media hosts', () => {
     expect(utils.validMediaUrl(new URL('https://upload.wikimedia.org/wikipedia/commons/Foo.png'))).toBe(true);
+    expect(utils.validMediaUrl(new URL('https://thumb.wikimedia.org/wikipedia/commons/thumb/Foo.png'))).toBe(true);
     expect(utils.validMediaUrl(new URL('https://maps.wikimedia.org/osm-intl/Foo.png'))).toBe(true);
     expect(utils.validMediaUrl(new URL('https://wikimedia.org/api/rest_v1/media/Foo'))).toBe(true);
     expect(utils.validMediaUrl(new URL('https://fr.wikipedia.org/api/rest_v1/page/pdf/Foo'))).toBe(true);
@@ -474,6 +492,22 @@ describe('Utils factory', () => {
     );
     expect(result.success).toBe(true);
     expect(result.path).toMatch(/media\/maps_wikimedia_org\/__test__\/osm-intl,10,a,a,270x200@2x\.[0-9a-f]{16}\.png$/);
+  });
+
+  test('saveFile() preserves the Wikimedia thumbnail host and uses its own cache root', async () => {
+    const result = await utils.saveFile(
+      new URL('https://thumb.wikimedia.org/__test__/thumbnail.png'),
+      '/__test__/thumbnail.png'
+    );
+
+    expect(mockGotStream).toHaveBeenCalledWith(
+      'https://thumb.wikimedia.org/__test__/thumbnail.png',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'User-Agent': 'test-agent' }),
+      })
+    );
+    expect(result.success).toBe(true);
+    expect(result.path).toMatch(/media\/thumb_wikimedia_org\/__test__\/thumbnail\.png$/);
   });
 
   test('saveFile() rejects path traversal and malformed encoded paths', async () => {

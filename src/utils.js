@@ -39,6 +39,9 @@ module.exports = function(redis, gotClient = null) {
     if(url.hostname === 'maps.wikimedia.org') {
       return path.resolve(__dirname, '../media/maps_wikimedia_org')
     }
+    if(url.hostname === 'thumb.wikimedia.org') {
+      return path.resolve(__dirname, '../media/thumb_wikimedia_org')
+    }
     if(url.hostname === 'wikimedia.org' && url.pathname.startsWith('/api/')) {
       return path.resolve(__dirname, '../media/api')
     }
@@ -49,6 +52,9 @@ module.exports = function(redis, gotClient = null) {
     const search = url.search || ''
     if(url.hostname === 'maps.wikimedia.org') {
       return `https://maps.wikimedia.org${mediaFilePath.urlPath}${search}`
+    }
+    if(url.hostname === 'thumb.wikimedia.org') {
+      return `https://thumb.wikimedia.org${mediaFilePath.urlPath}${search}`
     }
     if(url.hostname === 'wikimedia.org') {
       return `https://wikimedia.org/api${mediaFilePath.urlPath}${search}`
@@ -86,6 +92,17 @@ module.exports = function(redis, gotClient = null) {
       const params = new URLSearchParams(req.query).toString()
       return params ? `?${params}` : ''
     }
+  }
+
+  function removeTrackingParameters(search) {
+    const params = new URLSearchParams(search)
+    for(const key of [...params.keys()]) {
+      if(/^utm_/i.test(key)) {
+        params.delete(key)
+      }
+    }
+    const filtered = params.toString()
+    return filtered ? `?${filtered}` : ''
   }
 
   function wikipediaContextFromMapsUrl(url) {
@@ -322,7 +339,7 @@ module.exports = function(redis, gotClient = null) {
     if(url.protocol !== 'https:') {
       return false
     }
-    if(['upload.wikimedia.org', 'maps.wikimedia.org', 'wikimedia.org'].includes(url.hostname)) {
+    if(['upload.wikimedia.org', 'thumb.wikimedia.org', 'maps.wikimedia.org', 'wikimedia.org'].includes(url.hostname)) {
       return true
     }
     const wikipediaSuffix = '.wikipedia.org'
@@ -560,6 +577,10 @@ module.exports = function(redis, gotClient = null) {
       const upload_wikimedia_regx = /((https:|http:|)\/\/?upload\.wikimedia\.org)/gm
       data.html = data.html.replace(upload_wikimedia_regx, '/media')
 
+      // replace thumb.wikimedia.org with /media/thumb_wikimedia_org
+      const thumb_wikimedia_regx = /((https:|http:|)\/\/?thumb\.wikimedia\.org)/gm
+      data.html = data.html.replace(thumb_wikimedia_regx, '/media/thumb_wikimedia_org')
+
       // replace maps.wikimedia.org with /media/maps_wikimedia_org
       const maps_wikimedia_regx = /((https:|http:|)\/\/?maps\.wikimedia\.org)/gm
       data.html = data.html.replace(maps_wikimedia_regx, '/media/maps_wikimedia_org')
@@ -604,6 +625,14 @@ module.exports = function(redis, gotClient = null) {
         path = normalizeMediaPathFromRequest(requestPath.split('/media/maps_wikimedia_org')[1], encodeMapPathSegment)
         if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
         domain = 'maps.wikimedia.org'
+        wikimedia_path = path.urlPath + params
+        path = path.filePath
+        break;
+      case 'thumb.wikimedia.org':
+        path = normalizeMediaPathFromRequest(requestPath.split('/media/thumb_wikimedia_org')[1])
+        if(!path) return { success: false, reason: 'INVALID_MEDIA_PATH' }
+        domain = 'thumb.wikimedia.org'
+        params = removeTrackingParameters(params)
         wikimedia_path = path.urlPath + params
         path = path.filePath
         break;
