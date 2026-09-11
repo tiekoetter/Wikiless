@@ -13,7 +13,7 @@
     "http-proxy-agent": "^9.1.0",
     "https-proxy-agent": "^9.1.0",
     "lusca": "^1.7.0",
-    "node-html-parser": "^9.0.3",
+    "node-html-parser": "^9.0.4",
     "redis": "^6.2.1"
   },
   "devDependencies": {
