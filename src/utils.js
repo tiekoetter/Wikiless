@@ -8,7 +8,7 @@ module.exports = function(redis, gotClient = null) {
   const stream = require('stream')
   const { promisify } = require('util')
   const pipeline = promisify(stream.pipeline)
-  const mobileThemeVersion = '2'
+  const mobileThemeVersion = '3'
 
   let _got = gotClient;
   let proxyAgentsPromise = null;
@@ -468,9 +468,14 @@ module.exports = function(redis, gotClient = null) {
       data = data.replace(/<html\b/i, `<html data-wikiless-theme="${themeMode}"`)
     }
 
-    // ensure responsive viewport meta
-    if (!data.includes('name="viewport"')) {
-      data = data.replace('</head>', `<meta name="viewport" content="width=device-width, initial-scale=1">\r\n</head>`)
+    // Vector may provide a desktop-width viewport. Mobile pages must replace it
+    // rather than merely checking whether a viewport tag already exists.
+    const viewportPattern = /<meta\b(?=[^>]*\bname\s*=\s*(?:["']viewport["']|viewport))[^>]*>/i
+    const responsiveViewport = '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
+    if (isMobile && viewportPattern.test(data)) {
+      data = data.replace(viewportPattern, responsiveViewport)
+    } else if (!viewportPattern.test(data)) {
+      data = data.replace('</head>', `${responsiveViewport}\r\n</head>`)
     }
 
     if(theme === 'white') {

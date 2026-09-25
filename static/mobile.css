@@ -2,8 +2,8 @@
  * Wikiless mobile reading theme.
  *
  * The layout follows the restrained structure of Wikipedia's Minerva skin:
- * a compact top bar, a single readable content column, native-width tables
- * with overflow only when needed, and a small informational footer.
+ * familiar Wikiless navigation fitted to a phone, a single readable content
+ * column, responsive tables, and the regular footer in a wrapping layout.
  */
 
 html.is-mobile {
@@ -19,7 +19,7 @@ html.is-mobile {
   --mobile-link-visited: #6b4ba1;
   --mobile-link-active: #2a4b8d;
   --mobile-focus: #36c;
-  --mobile-header-height: 3.5rem;
+  --mobile-header-height: 6.75rem;
   color-scheme: light;
   min-width: 320px;
   background: var(--mobile-background);
@@ -116,17 +116,22 @@ html.is-mobile .wikiless-mobile-header {
   top: 0;
   z-index: 500;
   display: grid;
-  grid-template-columns: auto minmax(7rem, 1fr) auto;
+  grid-template:
+    "brand actions" auto
+    "search search" 2.75rem /
+    minmax(0, 1fr) auto;
   min-height: calc(var(--mobile-header-height) + env(safe-area-inset-top));
   padding: calc(0.5rem + env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) 0.5rem max(0.75rem, env(safe-area-inset-left));
   align-items: center;
-  gap: 0.65rem;
+  column-gap: 0.65rem;
+  row-gap: 0.5rem;
   border-bottom: 1px solid var(--mobile-border-subtle);
   background: var(--mobile-background-interactive);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 html.is-mobile .wikiless-mobile-brand {
+  grid-area: brand;
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -158,10 +163,11 @@ html.is-mobile .wikiless-mobile-wordmark {
 }
 
 html.is-mobile .wikiless-mobile-search {
+  grid-area: search;
   position: relative;
   display: flex;
   width: 100%;
-  height: 2.25rem;
+  height: 2.75rem;
   min-width: 0;
   margin: 0;
   overflow: hidden;
@@ -197,8 +203,8 @@ html.is-mobile .wikiless-mobile-search input::placeholder {
 
 html.is-mobile .wikiless-mobile-search button {
   display: grid;
-  flex: 0 0 2.25rem;
-  width: 2.25rem;
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
   height: 100%;
   padding: 0.45rem;
   place-items: center;
@@ -218,6 +224,7 @@ html.is-mobile .wikiless-mobile-actions svg {
 }
 
 html.is-mobile .wikiless-mobile-actions {
+  grid-area: actions;
   display: flex;
   align-items: center;
   gap: 0.15rem;
@@ -225,8 +232,8 @@ html.is-mobile .wikiless-mobile-actions {
 
 html.is-mobile .wikiless-mobile-actions a {
   display: inline-flex;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   padding: 0.45rem;
   align-items: center;
   justify-content: center;
@@ -643,9 +650,21 @@ html.is-mobile table.wikitable th {
 
 html.is-mobile table.navbox,
 html.is-mobile table.vertical-navbox {
-  width: 100%;
+  width: 100% !important;
+  min-width: 0 !important;
   border: 1px solid var(--mobile-border-subtle) !important;
   background: var(--mobile-background-subtle) !important;
+}
+
+html.is-mobile table.navbox table.navbox-subgroup,
+html.is-mobile table.vertical-navbox table {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+html.is-mobile table.navbox th.navbox-group {
+  width: 30% !important;
+  max-width: 9rem !important;
 }
 
 html.is-mobile .ambox,
@@ -680,7 +699,7 @@ html.is-mobile .references {
   line-height: 1.5 !important;
 }
 
-/* Compact footer: retain legal/edit information, remove duplicate site menus. */
+/* The normal Wikiless footer, reflowed instead of reduced for mobile. */
 html.is-mobile #footer,
 html.is-mobile .mw-footer {
   clear: both;
@@ -692,7 +711,7 @@ html.is-mobile .mw-footer {
   border-top: 1px solid var(--mobile-border-subtle);
   background: var(--mobile-background-subtle) !important;
   color: var(--mobile-color-subtle) !important;
-  font-size: 0.75rem !important;
+  font-size: 0.8125rem !important;
   line-height: 1.5 !important;
   text-align: start;
 }
@@ -710,6 +729,8 @@ html.is-mobile .mw-footer::before {
 }
 
 html.is-mobile #footer-info,
+html.is-mobile #footer-places,
+html.is-mobile #footer-icons,
 html.is-mobile .mw-footer #footer-info {
   width: min(100%, 50rem);
   margin: 0 auto !important;
@@ -725,10 +746,47 @@ html.is-mobile .mw-footer #footer-info li {
 }
 
 html.is-mobile #footer-places,
+html.is-mobile .mw-footer #footer-places {
+  display: flex !important;
+  float: none !important;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.85rem !important;
+}
+
+html.is-mobile #footer-places li,
+html.is-mobile .mw-footer #footer-places li {
+  display: inline-block !important;
+  float: none !important;
+  margin: 0 !important;
+  padding: 0.2rem 0 !important;
+}
+
 html.is-mobile #footer-icons,
-html.is-mobile .mw-footer #footer-places,
 html.is-mobile .mw-footer #footer-icons {
-  display: none !important;
+  display: flex !important;
+  float: none !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.85rem !important;
+}
+
+html.is-mobile #footer-icons li,
+html.is-mobile .mw-footer #footer-icons li {
+  display: block !important;
+  float: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+
+html.is-mobile #footer-icons img,
+html.is-mobile .mw-footer #footer-icons img {
+  width: auto !important;
+  max-width: 8rem !important;
+  height: auto !important;
+  max-height: 2.25rem !important;
 }
 
 html.is-mobile #footer a,
@@ -736,28 +794,38 @@ html.is-mobile .mw-footer a {
   color: var(--mobile-link) !important;
 }
 
-@media (max-width: 46rem) {
-  html.is-mobile .wikiless-mobile-wordmark,
-  html.is-mobile .wikiless-mobile-actions span {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-    white-space: nowrap !important;
+@media (max-width: 35.999rem) {
+  html.is-mobile .wikiless-mobile-actions {
+    gap: 0.25rem;
+  }
+
+  html.is-mobile .wikiless-mobile-actions svg {
+    display: none;
+  }
+
+  html.is-mobile .wikiless-mobile-actions a {
+    min-width: auto;
+    min-height: 2.5rem;
+    padding: 0.35rem 0.4rem;
+    font-size: 0.75rem;
   }
 }
 
 @media (max-width: 25rem) {
   html.is-mobile .wikiless-mobile-header {
-    grid-template-columns: auto minmax(6rem, 1fr) auto;
-    gap: 0.4rem;
-    padding-inline: 0.5rem;
+    column-gap: 0.35rem;
+    padding-inline: 0.625rem;
   }
 
-  html.is-mobile .wikiless-mobile-actions a {
-    min-width: 2.25rem;
-    padding-inline: 0.3rem;
+  html.is-mobile .wikiless-mobile-mark {
+    flex-basis: 1.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 1.25rem;
+  }
+
+  html.is-mobile .wikiless-mobile-wordmark {
+    font-size: 1rem;
   }
 
   html.is-mobile #content,
@@ -772,9 +840,23 @@ html.is-mobile .mw-footer a {
   }
 }
 
+@media (min-width: 36rem) {
+  html.is-mobile {
+    --mobile-header-height: 4rem;
+  }
+
+  html.is-mobile .wikiless-mobile-header {
+    grid-template:
+      "brand search actions" 2.75rem /
+      minmax(8rem, auto) minmax(10rem, 1fr) auto;
+  }
+}
+
 @media (min-width: 50rem) {
   html.is-mobile .wikiless-mobile-header {
-    grid-template-columns: minmax(9rem, 14rem) minmax(14rem, 30rem) auto;
+    grid-template:
+      "brand search actions" 2.75rem /
+      minmax(9rem, 14rem) minmax(14rem, 30rem) auto;
     justify-content: center;
   }
 }
