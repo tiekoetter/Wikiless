@@ -460,6 +460,13 @@ module.exports = function(redis, gotClient = null) {
       lang_suffix = '_' + lang
     }
 
+    const themeMode = theme === 'white' ? 'light' : theme === 'dark' ? 'dark' : 'auto'
+    if (/<html[^>]*\bdata-wikiless-theme=["']/i.test(data)) {
+      data = data.replace(/(<html[^>]*\bdata-wikiless-theme=["'])[^"']*(["'])/i, `$1${themeMode}$2`)
+    } else {
+      data = data.replace(/<html\b/i, `<html data-wikiless-theme="${themeMode}"`)
+    }
+
     // ensure responsive viewport meta
     if (!data.includes('name="viewport"')) {
       data = data.replace('</head>', `<meta name="viewport" content="width=device-width, initial-scale=1">\r\n</head>`)
@@ -550,10 +557,10 @@ module.exports = function(redis, gotClient = null) {
       if(nav) {
         nav.innerHTML = `
           <li>
-            <a href="/about">[ about ]</a>
+            <a href="/about">About</a>
           </li>
           <li>
-            <a href="/preferences?back=${url.split('wikipedia.org')[1]}">[ preferences ]</a>
+            <a href="/preferences?back=${url.split('wikipedia.org')[1]}">Preferences</a>
           </li>
 
         `

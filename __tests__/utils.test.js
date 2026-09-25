@@ -214,8 +214,21 @@ describe('Utils factory', () => {
     const html = '<html lang="en" class="client-nojs vector-feature-test"><head></head><body></body></html>';
     const result = utils.applyUserMods(html, 'white', 'en', true);
 
+    expect(result).toContain('data-wikiless-theme="light"');
     expect(result).toContain('class="client-nojs vector-feature-test is-mobile"');
     expect(result.match(/<html[^>]*\bclass=/g)).toHaveLength(1);
+  });
+
+  test.each([
+    ['white', 'light'],
+    ['dark', 'dark'],
+    ['', 'auto'],
+  ])('applyUserMods() exposes the %s color preference to mobile CSS', (theme, mode) => {
+    const html = '<html data-wikiless-theme="stale"><head></head><body></body></html>';
+    const result = utils.applyUserMods(html, theme, 'en', true);
+
+    expect(result).toContain(`data-wikiless-theme="${mode}"`);
+    expect(result.match(/data-wikiless-theme=/g)).toHaveLength(1);
   });
 
   test.each([
@@ -273,8 +286,8 @@ describe('Utils factory', () => {
     );
 
     expect(result.success).toBe(true);
-    expect(result.html).toContain('<a href="/about">[ about ]</a>');
-    expect(result.html).toContain('<a href="/preferences?back=/wiki/Foo?oldid=1">[ preferences ]</a>');
+    expect(result.html).toContain('<a href="/about">About</a>');
+    expect(result.html).toContain('<a href="/preferences?back=/wiki/Foo?oldid=1">Preferences</a>');
     expect(result.html).toContain('<input type="hidden" name="_csrf" value="csrf-token">');
     expect(result.html).toContain('<input type="hidden" name="lang" value="en">');
     expect(result.html).not.toContain('p-wikibase-otherprojects');
