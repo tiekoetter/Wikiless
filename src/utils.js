@@ -460,6 +460,13 @@ module.exports = function(redis, gotClient = null) {
       lang_suffix = '_' + lang
     }
 
+    const themeMode = theme === 'white' ? 'light' : theme === 'dark' ? 'dark' : 'auto'
+    if (/<html[^>]*\bdata-wikiless-theme=["']/i.test(data)) {
+      data = data.replace(/(<html[^>]*\bdata-wikiless-theme=["'])[^"']*(["'])/i, `$1${themeMode}$2`)
+    } else {
+      data = data.replace(/<html\b/i, `<html data-wikiless-theme="${themeMode}"`)
+    }
+
     // ensure responsive viewport meta
     if (!data.includes('name="viewport"')) {
       data = data.replace('</head>', `<meta name="viewport" content="width=device-width, initial-scale=1">\r\n</head>`)
@@ -476,16 +483,64 @@ module.exports = function(redis, gotClient = null) {
       data = data.replace('</head>', `<link rel="stylesheet" href="/styles${lang_suffix}.css"></head>`)
     }
 
-    // if mobile/tablet UA, mark html and load mobile overrides
+    // Mark mobile documents without replacing Wikipedia's existing html classes.
     if (isMobile) {
-      if (!data.includes('class="is-mobile"')) {
-        data = data.replace('<html', '<html class="is-mobile"')
+      if (!/(?:^|\s)is-mobile(?:\s|$)/.test((data.match(/<html[^>]*\bclass=["']([^"']*)["']/i) || [])[1] || '')) {
+        if (/<html[^>]*\bclass=["']/i.test(data)) {
+          data = data.replace(/(<html[^>]*\bclass=["'])([^"']*)(["'])/i, '$1$2 is-mobile$3')
+        } else {
+          data = data.replace(/<html\b/i, '<html class="is-mobile"')
+        }
       }
       data = data.replace('</head>', `<link rel="stylesheet" href="/mobile.css"></head>`)
     }
 
     
     return data
+  }
+
+  this.isMobileRequest = (req = {}) => {
+    const headers = req.headers || {}
+    const header = (name) => {
+      const value = headers[name] ?? headers[name.toLowerCase()]
+      return Array.isArray(value) ? value[0] : value
+    }
+
+    // A reverse proxy may normalize device detection to these two values.
+    const proxyDevice = String(header('x-wikiless-device') || '').trim().toLowerCase()
+    if(proxyDevice === 'mobile') return true
+    if(proxyDevice === 'desktop') return false
+
+    // Chromium sends this low-entropy hint by default. Unlike a physical-device
+    // test, it reflects "Request desktop/mobile site" browser preferences.
+    const mobileHint = String(header('sec-ch-ua-mobile') || '').trim()
+    if(mobileHint === '?1') return true
+    if(mobileHint === '?0') return false
+
+    const ua = String(header('user-agent') || '')
+
+    // Safari's desktop-site mode on iPad identifies itself as Macintosh while
+    // retaining a Mobile build token, so Macintosh must win over that token.
+    if(/Macintosh/i.test(ua)) return false
+
+    return /Android|iPhone|iPad|iPod|Mobile|Tablet|Windows Phone|webOS|BlackBerry/i.test(ua)
+  }
+
+  this.setWikiPageCacheHeaders = (req, res, isMobile) => {
+    res.setHeader('Accept-CH', 'Sec-CH-UA-Mobile')
+    res.setHeader('Vary', 'Sec-CH-UA-Mobile, User-Agent, X-Wikiless-Device, Cookie')
+    res.setHeader('X-Wikiless-Device', isMobile ? 'mobile' : 'desktop')
+
+    // Preference query parameters also set cookies. Never let that transitional
+    // response enter a shared cache; the following cookie-only request can be.
+    if(req.query && (req.query.theme !== undefined || req.query.default_lang !== undefined)) {
+      res.setHeader('Cache-Control', 'private, no-store')
+      return
+    }
+
+    const configuredTtl = Number.parseInt(config.setexs && config.setexs.wikipage, 10)
+    const sharedTtl = Number.isFinite(configuredTtl) && configuredTtl >= 0 ? configuredTtl : 3600
+    res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${sharedTtl}`)
   }
 
   this.processHtml = async (data, url, params, lang, cookies = {}, csrfToken = '') => {
@@ -502,10 +557,10 @@ module.exports = function(redis, gotClient = null) {
       if(nav) {
         nav.innerHTML = `
           <li>
-            <a href="/about">[ about ]</a>
+            <a href="/about">About</a>
           </li>
           <li>
-            <a href="/preferences?back=${url.split('wikipedia.org')[1]}">[ preferences ]</a>
+            <a href="/preferences?back=${url.split('wikipedia.org')[1]}">Preferences</a>
           </li>
 
         `
@@ -789,9 +844,7 @@ module.exports = function(redis, gotClient = null) {
     let page = ''
     let sub_page = ''
 
-    // Detect mobile/tablet user-agents to enable mobile layout
-    const ua = (req.headers && req.headers['user-agent']) || ''
-    const isMobile = /Android|iPhone|iPad|iPod|Mobile|Tablet|Windows Phone|webOS|BlackBerry/i.test(ua)
+    const isMobile = this.isMobileRequest(req)
 
     switch (prefix) {
       case '/wiki/':
@@ -863,6 +916,7 @@ module.exports = function(redis, gotClient = null) {
     }
 
     if(result.processed === true) {
+      this.setWikiPageCacheHeaders(req, res, isMobile)
       return res.send(this.applyUserMods(result.html, req.cookies.theme, lang, isMobile))
     }
 
@@ -871,6 +925,7 @@ module.exports = function(redis, gotClient = null) {
     const csrfToken = typeof req.csrfToken === 'function' ? req.csrfToken() : ''
     const process_html = await this.processHtml(result, url, down_params, lang, req.cookies, csrfToken)
     if(process_html.success === true) {
+      this.setWikiPageCacheHeaders(req, res, isMobile)
       return res.send(this.applyUserMods(process_html.html.toString(), req.cookies.theme, lang, isMobile))
     }
     return res.status(500).send(process_html.reason)
