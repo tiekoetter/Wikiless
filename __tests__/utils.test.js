@@ -208,10 +208,21 @@ describe('Utils factory', () => {
     expect(result).toContain('href="/styles_fr.css"');
     expect(result).toContain('class="is-mobile"');
     expect(result).toContain('data-wikiless-theme="auto"');
-    expect(result).toContain('href="/mobile.css?v=2"');
+    expect(result).toContain('href="/mobile.css?v=3"');
     expect(result).toContain('class="wikiless-mobile-header"');
     expect(result).toContain('class="wikiless-mobile-search"');
+    expect(result).toContain('href="/?lang=fr"');
+    expect(result).toContain('href="/about"');
     expect(result).toContain('href="/preferences?back=%2Fwiki%2FFoo%3Flang%3Dfr"');
+  });
+
+  test('applyUserMods() replaces Vector desktop viewport on mobile', () => {
+    const html = '<html><head><meta content="width=1000" name="viewport"></head><body></body></html>';
+    const result = utils.applyUserMods(html, 'white', 'en', true);
+
+    expect(result).toContain('content="width=device-width, initial-scale=1, viewport-fit=cover"');
+    expect(result).not.toContain('content="width=1000"');
+    expect(result.match(/name="viewport"/g)).toHaveLength(1);
   });
 
   test('applyUserMods() preserves Wikipedia classes and does not duplicate the mobile header', () => {
