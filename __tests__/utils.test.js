@@ -103,6 +103,22 @@ describe('Utils factory', () => {
     );
   });
 
+  test('download() forwards encoded multi-word search parameters once', async () => {
+    const gotClient = jest.fn(async () => ({ body: '<html></html>' }));
+    utils = new Utils(fakeRedis, gotClient);
+
+    const result = await utils.download(
+      'https://en.wikipedia.org/w/index.php',
+      'title=Special%3ASearch&search=New+York'
+    );
+
+    expect(result.success).toBe(true);
+    expect(gotClient).toHaveBeenCalledWith(
+      'https://en.wikipedia.org/w/index.php?title=Special%3ASearch&search=New+York&useskin=vector',
+      expect.any(Object)
+    );
+  });
+
   test('download() does not retry upstream requests independently', async () => {
     const gotClient = jest.fn(async () => ({ body: '<html></html>' }));
     utils = new Utils(fakeRedis, gotClient);

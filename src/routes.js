@@ -171,18 +171,6 @@ module.exports = (app, utils) => {
     return handleWikiPage(req, res, '/wiki/')
   })
 
-  // Handle the search request and redirect to the correct wiki page
-  app.get('/w/index.php', (req, res, next) => {
-    const searchQuery = req.query.search
-    if (searchQuery) {
-      // Construct the URL to redirect to the proper wiki page
-      const lang = req.query.lang || req.cookies.default_lang || config.default_lang
-      const redirectUrl = `/wiki/${encodeURIComponent(searchQuery)}?lang=${lang}`
-      return res.redirect(redirectUrl)
-    }
-    return next()
-  })
-
   app.get('/w/:file', (req, res, next) => {
     return handleWikiPage(req, res, '/w/')
   })

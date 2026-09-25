@@ -199,10 +199,15 @@ describe('Routes wiring', () => {
     expect(res.status).toBe(500);
   });
 
-  it('GET /w/index.php?search=Foo&lang=de -> redirect', async () => {
-    const res = await request(app).get('/w/index.php?search=Foo&lang=de');
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe('/wiki/Foo?lang=de');
+  it('GET /w/index.php forwards a multi-word search to Wikipedia search', async () => {
+    const res = await request(app).get('/w/index.php?search=New+York&lang=de');
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('HANDLED_/w/');
+    expect(utils.handleWikiPage).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ search: 'New York', lang: 'de' }) }),
+      expect.anything(),
+      '/w/'
+    );
   });
 
   it('GET /w/index.php without search falls through to /w/:file', async () => {

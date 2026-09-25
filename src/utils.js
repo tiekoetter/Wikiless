@@ -377,10 +377,9 @@ module.exports = function(redis, gotClient = null) {
     }
 
     if (params) {
-      params.split('&').forEach(p => {
-        const [k, v] = p.split('=');
-        u.searchParams.set(k, v);
-      });
+      for(const [key, value] of new URLSearchParams(params)) {
+        u.searchParams.set(key, value)
+      }
     }
     u.searchParams.set('useskin', 'vector');
     url = `https://${downloadLang}.wikipedia.org${u.pathname}${u.search}`;
