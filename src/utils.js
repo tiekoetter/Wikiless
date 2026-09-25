@@ -8,6 +8,7 @@ module.exports = function(redis, gotClient = null) {
   const stream = require('stream')
   const { promisify } = require('util')
   const pipeline = promisify(stream.pipeline)
+  const mobileThemeVersion = '2'
 
   let _got = gotClient;
   let proxyAgentsPromise = null;
@@ -446,7 +447,7 @@ module.exports = function(redis, gotClient = null) {
     }
   };
 
-  this.applyUserMods = (data, theme, lang, isMobile=false) => {
+  this.applyUserMods = (data, theme, lang, isMobile=false, currentPath='/') => {
     /**
     * Apply user-specific modifications to the processed HTML.
     * This includes theme, language, and mobile-specific adjustments.
@@ -483,7 +484,7 @@ module.exports = function(redis, gotClient = null) {
       data = data.replace('</head>', `<link rel="stylesheet" href="/styles${lang_suffix}.css"></head>`)
     }
 
-    // Mark mobile documents without replacing Wikipedia's existing html classes.
+    // Mark mobile documents without replacing Wikipedia's existing classes.
     if (isMobile) {
       if (!/(?:^|\s)is-mobile(?:\s|$)/.test((data.match(/<html[^>]*\bclass=["']([^"']*)["']/i) || [])[1] || '')) {
         if (/<html[^>]*\bclass=["']/i.test(data)) {
@@ -492,7 +493,42 @@ module.exports = function(redis, gotClient = null) {
           data = data.replace(/<html\b/i, '<html class="is-mobile"')
         }
       }
-      data = data.replace('</head>', `<link rel="stylesheet" href="/mobile.css"></head>`)
+
+      const safePath = typeof currentPath === 'string' && currentPath.startsWith('/') && !currentPath.startsWith('//')
+        ? currentPath
+        : '/'
+      const encodedLang = encodeURIComponent(lang)
+      const preferencesUrl = `/preferences?back=${encodeURIComponent(safePath)}`
+      const mobileHeader = `
+        <header class="wikiless-mobile-header">
+          <a class="wikiless-mobile-brand" href="/?lang=${encodedLang}" aria-label="Wikiless home">
+            <span class="wikiless-mobile-mark" aria-hidden="true">W</span>
+            <span class="wikiless-mobile-wordmark">Wikiless</span>
+          </a>
+          <form class="wikiless-mobile-search" action="/w/index.php" method="get" role="search">
+            <label class="wikiless-visually-hidden" for="wikiless-mobile-search-input">Search Wikipedia</label>
+            <input id="wikiless-mobile-search-input" name="search" type="search" placeholder="Search Wikipedia" autocomplete="off">
+            <input name="lang" type="hidden" value="${encodedLang}">
+            <button type="submit" aria-label="Search">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m13.2 12 4.4 4.4-1.2 1.2-4.4-4.4a7 7 0 1 1 1.2-1.2ZM8 13.3A5.3 5.3 0 1 0 8 2.7a5.3 5.3 0 0 0 0 10.6Z"/></svg>
+            </button>
+          </form>
+          <nav class="wikiless-mobile-actions" aria-label="Wikiless">
+            <a href="/about" aria-label="About Wikiless">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.7a8.3 8.3 0 1 0 0 16.6 8.3 8.3 0 0 0 0-16.6Zm0 15A6.7 6.7 0 1 1 10 3.3a6.7 6.7 0 0 1 0 13.4ZM9.2 8.3h1.6v5H9.2v-5Zm0-2.5h1.6v1.7H9.2V5.8Z"/></svg>
+              <span>About</span>
+            </a>
+            <a href="${preferencesUrl}" aria-label="Preferences">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.8 1.7h2.4l.4 2a6 6 0 0 1 1.2.7l2-.6L16 5.9l-1.6 1.3c.1.4.2.9.2 1.3s-.1.9-.2 1.3l1.6 1.3-1.2 2.1-2-.6a6 6 0 0 1-1.2.7l-.4 2H8.8l-.4-2a6 6 0 0 1-1.2-.7l-2 .6L4 11.1l1.6-1.3a5 5 0 0 1 0-2.6L4 5.9l1.2-2.1 2 .6a6 6 0 0 1 1.2-.7l.4-2ZM10 6.2a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6Z"/></svg>
+              <span>Preferences</span>
+            </a>
+          </nav>
+        </header>`
+
+      if (!data.includes('class="wikiless-mobile-header"')) {
+        data = data.replace(/(<body\b[^>]*>)/i, `$1${mobileHeader}`)
+      }
+      data = data.replace('</head>', `<link rel="stylesheet" href="/mobile.css?v=${mobileThemeVersion}"></head>`)
     }
 
     
@@ -845,6 +881,7 @@ module.exports = function(redis, gotClient = null) {
     let sub_page = ''
 
     const isMobile = this.isMobileRequest(req)
+    const currentPath = req.originalUrl || req.url || '/'
 
     switch (prefix) {
       case '/wiki/':
@@ -917,7 +954,7 @@ module.exports = function(redis, gotClient = null) {
 
     if(result.processed === true) {
       this.setWikiPageCacheHeaders(req, res, isMobile)
-      return res.send(this.applyUserMods(result.html, req.cookies.theme, lang, isMobile))
+      return res.send(this.applyUserMods(result.html, req.cookies.theme, lang, isMobile, currentPath))
     }
 
     // wikiless params
@@ -926,7 +963,7 @@ module.exports = function(redis, gotClient = null) {
     const process_html = await this.processHtml(result, url, down_params, lang, req.cookies, csrfToken)
     if(process_html.success === true) {
       this.setWikiPageCacheHeaders(req, res, isMobile)
-      return res.send(this.applyUserMods(process_html.html.toString(), req.cookies.theme, lang, isMobile))
+      return res.send(this.applyUserMods(process_html.html.toString(), req.cookies.theme, lang, isMobile, currentPath))
     }
     return res.status(500).send(process_html.reason)
   }

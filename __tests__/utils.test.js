@@ -203,19 +203,24 @@ describe('Utils factory', () => {
 
   test('applyUserMods() handles localized auto styles and mobile overrides', () => {
     const html = '<html><head></head><body></body></html>';
-    const result = utils.applyUserMods(html, '', 'fr', true);
+    const result = utils.applyUserMods(html, '', 'fr', true, '/wiki/Foo?lang=fr');
     expect(result).toContain('name="viewport"');
     expect(result).toContain('href="/styles_fr.css"');
     expect(result).toContain('class="is-mobile"');
-    expect(result).toContain('href="/mobile.css"');
+    expect(result).toContain('data-wikiless-theme="auto"');
+    expect(result).toContain('href="/mobile.css?v=2"');
+    expect(result).toContain('class="wikiless-mobile-header"');
+    expect(result).toContain('class="wikiless-mobile-search"');
+    expect(result).toContain('href="/preferences?back=%2Fwiki%2FFoo%3Flang%3Dfr"');
   });
 
-  test('applyUserMods() preserves existing html classes in the mobile variant', () => {
-    const html = '<html lang="en" class="client-nojs vector-feature-test"><head></head><body></body></html>';
-    const result = utils.applyUserMods(html, 'white', 'en', true);
+  test('applyUserMods() preserves Wikipedia classes and does not duplicate the mobile header', () => {
+    const html = '<html lang="en" class="client-nojs vector-feature-test"><head></head><body><header class="wikiless-mobile-header"></header></body></html>';
+    const result = utils.applyUserMods(html, 'white', 'en', true, '//invalid.example');
 
     expect(result).toContain('data-wikiless-theme="light"');
     expect(result).toContain('class="client-nojs vector-feature-test is-mobile"');
+    expect(result.match(/class="wikiless-mobile-header"/g)).toHaveLength(1);
     expect(result.match(/<html[^>]*\bclass=/g)).toHaveLength(1);
   });
 
@@ -223,9 +228,13 @@ describe('Utils factory', () => {
     ['white', 'light'],
     ['dark', 'dark'],
     ['', 'auto'],
-  ])('applyUserMods() exposes the %s color preference to mobile CSS', (theme, mode) => {
-    const html = '<html data-wikiless-theme="stale"><head></head><body></body></html>';
-    const result = utils.applyUserMods(html, theme, 'en', true);
+  ])('applyUserMods() exposes the %s preference to mobile CSS', (theme, mode) => {
+    const result = utils.applyUserMods(
+      '<html data-wikiless-theme="stale"><head></head><body></body></html>',
+      theme,
+      'en',
+      true
+    );
 
     expect(result).toContain(`data-wikiless-theme="${mode}"`);
     expect(result.match(/data-wikiless-theme=/g)).toHaveLength(1);
@@ -629,6 +638,7 @@ describe('Utils factory', () => {
 
   test('handleWikiPage() sends cached processed HTML with user mods', async () => {
     const req = {
+      originalUrl: '/wiki/Foo?lang=fr&oldid=1',
       query: { lang: 'fr', oldid: '1' },
       cookies: { theme: 'dark' },
       headers: { 'user-agent': 'iPhone' },
@@ -641,8 +651,7 @@ describe('Utils factory', () => {
     await utils.handleWikiPage(req, res, '/wiki/');
 
     expect(utils.download).toHaveBeenCalledWith('https://fr.wikipedia.org/wiki/Foo', 'oldid=1&useskin=vector');
-    expect(utils.applyUserMods).toHaveBeenCalledWith('<html></html>', 'dark', 'fr', true);
-    expect(res.setHeader).toHaveBeenCalledWith('Accept-CH', 'Sec-CH-UA-Mobile');
+    expect(utils.applyUserMods).toHaveBeenCalledWith('<html></html>', 'dark', 'fr', true, '/wiki/Foo?lang=fr&oldid=1');
     expect(res.setHeader).toHaveBeenCalledWith('Vary', 'Sec-CH-UA-Mobile, User-Agent, X-Wikiless-Device, Cookie');
     expect(res.setHeader).toHaveBeenCalledWith('X-Wikiless-Device', 'mobile');
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'public, max-age=0, s-maxage=3600');

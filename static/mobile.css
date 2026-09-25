@@ -1,79 +1,73 @@
 /*
- * Mobile reading layer
+ * Wikiless mobile reading theme.
  *
- * Keep this stylesheet scoped to html.is-mobile. The server selects that
- * variant, while data-wikiless-theme keeps explicit and automatic color
- * preferences consistent with the desktop stylesheets.
+ * The layout follows the restrained structure of Wikipedia's Minerva skin:
+ * a compact top bar, a single readable content column, native-width tables
+ * with overflow only when needed, and a small informational footer.
  */
 
 html.is-mobile {
-  --mobile-canvas: #f3f6f8;
-  --mobile-surface: #ffffff;
-  --mobile-surface-muted: #f6f8fa;
-  --mobile-text: #20252b;
-  --mobile-text-muted: #5b6570;
-  --mobile-heading: #111418;
-  --mobile-border: #d9e0e7;
-  --mobile-border-strong: #bdc7d1;
-  --mobile-link: #245ec7;
-  --mobile-link-visited: #6548a8;
-  --mobile-accent: #3366cc;
-  --mobile-accent-soft: rgba(51, 102, 204, 0.1);
-  --mobile-header: rgba(255, 255, 255, 0.96);
-  --mobile-shadow: 0 10px 32px rgba(28, 39, 49, 0.08);
-  --mobile-radius: 12px;
+  --mobile-background: #ffffff;
+  --mobile-background-subtle: #f8f9fa;
+  --mobile-background-interactive: #ffffff;
+  --mobile-color: #202122;
+  --mobile-color-subtle: #54595d;
+  --mobile-color-placeholder: #72777d;
+  --mobile-border: #a2a9b1;
+  --mobile-border-subtle: #c8ccd1;
+  --mobile-link: #36c;
+  --mobile-link-visited: #6b4ba1;
+  --mobile-link-active: #2a4b8d;
+  --mobile-focus: #36c;
+  --mobile-header-height: 3.5rem;
   color-scheme: light;
-  background: var(--mobile-canvas);
-  scroll-padding-top: 5.5rem;
+  min-width: 320px;
+  background: var(--mobile-background);
+  scroll-padding-top: calc(var(--mobile-header-height) + 1rem);
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
 html.is-mobile[data-wikiless-theme="dark"] {
-  --mobile-canvas: #15181c;
-  --mobile-surface: #202429;
-  --mobile-surface-muted: #292e34;
-  --mobile-text: #e4e8ec;
-  --mobile-text-muted: #aab4bf;
-  --mobile-heading: #f5f7f9;
-  --mobile-border: #3a424b;
-  --mobile-border-strong: #56616d;
-  --mobile-link: #8ab4ff;
-  --mobile-link-visited: #c2a7ff;
-  --mobile-accent: #8ab4ff;
-  --mobile-accent-soft: rgba(138, 180, 255, 0.14);
-  --mobile-header: rgba(32, 36, 41, 0.96);
-  --mobile-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+  --mobile-background: #202122;
+  --mobile-background-subtle: #27292d;
+  --mobile-background-interactive: #202122;
+  --mobile-color: #eaecf0;
+  --mobile-color-subtle: #bdc1c6;
+  --mobile-color-placeholder: #a2a9b1;
+  --mobile-border: #72777d;
+  --mobile-border-subtle: #54595d;
+  --mobile-link: #6af;
+  --mobile-link-visited: #b8a3e3;
+  --mobile-link-active: #8ab8ff;
+  --mobile-focus: #6af;
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   html.is-mobile[data-wikiless-theme="auto"] {
-    --mobile-canvas: #15181c;
-    --mobile-surface: #202429;
-    --mobile-surface-muted: #292e34;
-    --mobile-text: #e4e8ec;
-    --mobile-text-muted: #aab4bf;
-    --mobile-heading: #f5f7f9;
-    --mobile-border: #3a424b;
-    --mobile-border-strong: #56616d;
-    --mobile-link: #8ab4ff;
-    --mobile-link-visited: #c2a7ff;
-    --mobile-accent: #8ab4ff;
-    --mobile-accent-soft: rgba(138, 180, 255, 0.14);
-    --mobile-header: rgba(32, 36, 41, 0.96);
-    --mobile-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+    --mobile-background: #202122;
+    --mobile-background-subtle: #27292d;
+    --mobile-background-interactive: #202122;
+    --mobile-color: #eaecf0;
+    --mobile-color-subtle: #bdc1c6;
+    --mobile-color-placeholder: #a2a9b1;
+    --mobile-border: #72777d;
+    --mobile-border-subtle: #54595d;
+    --mobile-link: #6af;
+    --mobile-link-visited: #b8a3e3;
+    --mobile-link-active: #8ab8ff;
+    --mobile-focus: #6af;
     color-scheme: dark;
   }
 }
 
 html.is-mobile,
 html.is-mobile body {
-  min-width: 0;
   margin: 0;
   padding: 0;
-  background: var(--mobile-canvas) !important;
-  color: var(--mobile-text) !important;
+  background: var(--mobile-background) !important;
+  color: var(--mobile-color) !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   font-size: 16px;
@@ -81,7 +75,9 @@ html.is-mobile body {
 }
 
 html.is-mobile body {
+  min-width: 320px;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: rgba(51, 102, 204, 0.18);
 }
 
 html.is-mobile *,
@@ -90,218 +86,216 @@ html.is-mobile *::after {
   box-sizing: border-box;
 }
 
-/* Remove desktop-only framing and navigation. */
+html.is-mobile .wikiless-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* The legacy Vector navigation follows the article in the source document. */
+html.is-mobile #mw-navigation,
+html.is-mobile #mw-head,
 html.is-mobile #mw-head-base,
 html.is-mobile #mw-page-base,
 html.is-mobile #mw-panel,
 html.is-mobile .vector-column-start,
 html.is-mobile .vector-column-end,
 html.is-mobile #p-logo,
-html.is-mobile .mw-wiki-logo,
-html.is-mobile #left-navigation,
-html.is-mobile #p-views,
-html.is-mobile #p-cactions,
-html.is-mobile #p-variants {
+html.is-mobile .mw-wiki-logo {
   display: none !important;
 }
 
-/* Compact sticky navigation with search and the Wikiless utility links. */
-html.is-mobile #mw-head {
-  position: sticky !important;
-  inset: 0 0 auto 0;
-  z-index: 300;
-  display: flex !important;
-  width: 100% !important;
-  min-height: 3.75rem;
-  margin: 0 !important;
-  padding: 0.6rem clamp(0.75rem, 4vw, 1.25rem) !important;
+/* Mobile-only header, inserted directly after <body>. */
+html.is-mobile .wikiless-mobile-header {
+  position: sticky;
+  top: 0;
+  z-index: 500;
+  display: grid;
+  grid-template-columns: auto minmax(7rem, 1fr) auto;
+  min-height: calc(var(--mobile-header-height) + env(safe-area-inset-top));
+  padding: calc(0.5rem + env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) 0.5rem max(0.75rem, env(safe-area-inset-left));
   align-items: center;
   gap: 0.65rem;
-  border-bottom: 1px solid var(--mobile-border);
-  background: var(--mobile-header) !important;
-  box-shadow: 0 1px 8px rgba(20, 28, 35, 0.08);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border-bottom: 1px solid var(--mobile-border-subtle);
+  background: var(--mobile-background-interactive);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-html.is-mobile #mw-head::before {
-  content: "W";
+html.is-mobile .wikiless-mobile-brand {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--mobile-color) !important;
+  text-decoration: none;
+}
+
+html.is-mobile .wikiless-mobile-mark {
   display: grid;
-  flex: 0 0 2.55rem;
-  width: 2.55rem;
-  height: 2.55rem;
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
   place-items: center;
-  border: 1px solid var(--mobile-border);
-  border-radius: 50%;
-  background: var(--mobile-surface);
-  color: var(--mobile-heading);
+  border: 1px solid var(--mobile-border-subtle);
+  border-radius: 2px;
+  background: var(--mobile-background);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.45rem;
   font-weight: 700;
   line-height: 1;
-  box-shadow: 0 2px 8px rgba(20, 28, 35, 0.08);
 }
 
-html.is-mobile #right-navigation {
-  position: static !important;
-  display: flex !important;
-  flex: 1 1 auto;
-  float: none !important;
-  min-width: 0;
-  margin: 0 !important;
-  align-items: center;
+html.is-mobile .wikiless-mobile-wordmark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-html.is-mobile #p-search {
-  display: block !important;
-  float: none !important;
-  width: 100%;
-  min-width: 0;
-  margin: 0 !important;
-}
-
-html.is-mobile #p-search form,
-html.is-mobile #searchform {
-  position: static !important;
-  display: flex;
-  width: 100%;
-  max-width: none;
-  margin: 0 !important;
-  align-items: stretch;
-}
-
-html.is-mobile #simpleSearch {
+html.is-mobile .wikiless-mobile-search {
   position: relative;
   display: flex;
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  height: 2.65rem;
+  width: 100%;
+  height: 2.25rem;
+  min-width: 0;
+  margin: 0;
   overflow: hidden;
-  border: 1px solid var(--mobile-border-strong) !important;
-  border-radius: 999px;
-  background: var(--mobile-surface-muted) !important;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  border: 1px solid var(--mobile-border);
+  border-radius: 2px;
+  background: var(--mobile-background);
 }
 
-html.is-mobile #simpleSearch:focus-within {
-  border-color: var(--mobile-accent) !important;
-  box-shadow: 0 0 0 3px var(--mobile-accent-soft);
+html.is-mobile .wikiless-mobile-search:focus-within {
+  border-color: var(--mobile-focus);
+  box-shadow: inset 0 0 0 1px var(--mobile-focus);
 }
 
-html.is-mobile #searchInput {
+html.is-mobile .wikiless-mobile-search input[type="search"] {
   width: 100%;
   min-width: 0;
   height: 100%;
-  padding: 0 0.9rem !important;
-  border: 0 !important;
+  padding: 0.35rem 0.65rem;
+  border: 0;
   outline: 0;
-  background: transparent !important;
-  color: var(--mobile-text) !important;
+  background: transparent;
+  color: var(--mobile-color);
   font: inherit;
-  font-size: 1rem !important;
+  font-size: 0.875rem;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-html.is-mobile #searchInput::placeholder {
-  color: var(--mobile-text-muted);
-  opacity: 0.85;
+html.is-mobile .wikiless-mobile-search input::placeholder {
+  color: var(--mobile-color-placeholder);
+  opacity: 1;
 }
 
-html.is-mobile #searchButton {
-  position: static !important;
-  flex: 0 0 2.75rem;
-  width: 2.75rem;
+html.is-mobile .wikiless-mobile-search button {
+  display: grid;
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
   height: 100%;
-  border: 0 !important;
-  border-inline-start: 1px solid var(--mobile-border) !important;
-  background-color: var(--mobile-surface) !important;
-  color: var(--mobile-text) !important;
+  padding: 0.45rem;
+  place-items: center;
+  border: 0;
+  border-inline-start: 1px solid var(--mobile-border-subtle);
+  background: var(--mobile-background-subtle);
+  color: var(--mobile-color);
   cursor: pointer;
 }
 
-html.is-mobile #p-personal {
-  position: static !important;
-  flex: 0 0 auto;
-  margin: 0 !important;
-  font-size: 0.8125rem !important;
+html.is-mobile .wikiless-mobile-search svg,
+html.is-mobile .wikiless-mobile-actions svg {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
 }
 
-html.is-mobile #p-personal ul {
+html.is-mobile .wikiless-mobile-actions {
   display: flex;
-  margin: 0 !important;
-  padding: 0 !important;
   align-items: center;
-  gap: 0.25rem;
-  list-style: none;
+  gap: 0.15rem;
 }
 
-html.is-mobile #p-personal li {
-  float: none !important;
-  margin: 0 !important;
-}
-
-html.is-mobile #p-personal a {
+html.is-mobile .wikiless-mobile-actions a {
   display: inline-flex;
+  min-width: 2.5rem;
   min-height: 2.5rem;
-  padding: 0.45rem 0.6rem;
+  padding: 0.45rem;
   align-items: center;
-  border-radius: 8px;
-  color: var(--mobile-link) !important;
-  font-size: 0.8125rem !important;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 2px;
+  color: var(--mobile-color) !important;
+  font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.2 !important;
   text-decoration: none;
 }
 
-html.is-mobile #p-personal a:hover {
-  background: var(--mobile-accent-soft);
+html.is-mobile .wikiless-mobile-actions a:hover {
+  background: var(--mobile-background-subtle);
 }
 
-/* One content gutter: nested Vector containers must not each add padding. */
+/* Article column and typography. */
 html.is-mobile #content,
 html.is-mobile .mw-body {
-  width: min(100%, 56rem) !important;
-  max-width: 56rem !important;
+  width: min(100%, 50rem) !important;
+  max-width: 50rem !important;
   min-width: 0;
   margin: 0 auto !important;
-  padding: clamp(1.15rem, 4.5vw, 2.25rem) clamp(1rem, 4.5vw, 2.5rem) 2.5rem !important;
+  padding: 1.1rem 1rem 2.5rem !important;
   border: 0 !important;
-  background: var(--mobile-surface) !important;
-  color: var(--mobile-text) !important;
-  overflow-wrap: anywhere;
+  background: var(--mobile-background) !important;
+  color: var(--mobile-color) !important;
+  overflow-wrap: break-word;
+}
+
+html.is-mobile #mw-data-after-content {
+  width: min(100%, 50rem) !important;
+  max-width: 50rem !important;
+  margin: 0 auto !important;
+  padding: 0 1rem !important;
 }
 
 html.is-mobile .mw-body-content,
 html.is-mobile .vector-body,
 html.is-mobile .mw-content-container,
-html.is-mobile .mw-parser-output {
+html.is-mobile .mw-parser-output,
+html.is-mobile #bodyContent,
+html.is-mobile #mw-content-text {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0;
   margin: 0 !important;
   padding: 0 !important;
-  color: var(--mobile-text) !important;
+  color: var(--mobile-color) !important;
   font-size: 1rem !important;
   line-height: 1.65 !important;
 }
 
 html.is-mobile .firstHeading {
-  margin: 0 0 0.45rem !important;
-  padding: 0 0 0.55rem !important;
-  border-bottom: 1px solid var(--mobile-border) !important;
-  color: var(--mobile-heading) !important;
+  margin: 0.35rem 0 0.75rem !important;
+  padding: 0 0 0.3rem !important;
+  border-bottom: 1px solid var(--mobile-border-subtle) !important;
+  color: var(--mobile-color) !important;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(1.9rem, 8vw, 2.55rem) !important;
-  font-weight: 700;
-  line-height: 1.12 !important;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.8rem, 7vw, 2.25rem) !important;
+  font-weight: 400;
+  line-height: 1.2 !important;
+  letter-spacing: -0.01em;
 }
 
 html.is-mobile #siteSub,
 html.is-mobile #contentSub,
 html.is-mobile #contentSub2,
 html.is-mobile .mw-indicators {
-  color: var(--mobile-text-muted) !important;
+  color: var(--mobile-color-subtle) !important;
   font-size: 0.8125rem !important;
 }
 
@@ -311,44 +305,46 @@ html.is-mobile .mw-body-content h4,
 html.is-mobile .mw-body-content h5,
 html.is-mobile .mw-body-content h6 {
   clear: both;
-  scroll-margin-top: 5.25rem;
-  color: var(--mobile-heading) !important;
+  scroll-margin-top: calc(var(--mobile-header-height) + 1rem);
+  color: var(--mobile-color) !important;
   line-height: 1.25 !important;
 }
 
 html.is-mobile .mw-body-content h2 {
-  margin: 2.25rem 0 0.8rem !important;
-  padding-bottom: 0.35rem;
-  border-bottom: 1px solid var(--mobile-border) !important;
+  margin: 2rem 0 0.75rem !important;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--mobile-border-subtle) !important;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 1.5rem !important;
+  font-weight: 400;
 }
 
 html.is-mobile .mw-body-content h3 {
-  margin: 1.8rem 0 0.65rem !important;
-  font-size: 1.25rem !important;
+  margin: 1.6rem 0 0.6rem !important;
+  font-size: 1.2rem !important;
 }
 
 html.is-mobile .mw-body-content h4,
 html.is-mobile .mw-body-content h5,
 html.is-mobile .mw-body-content h6 {
-  margin: 1.4rem 0 0.55rem !important;
-  font-size: 1.0625rem !important;
+  margin: 1.35rem 0 0.5rem !important;
+  font-size: 1rem !important;
 }
 
 html.is-mobile .mw-parser-output > p,
 html.is-mobile .mw-parser-output > ul,
 html.is-mobile .mw-parser-output > ol {
   margin-top: 0;
-  margin-bottom: 1.05rem;
+  margin-bottom: 1rem;
 }
 
 html.is-mobile .mw-parser-output ul,
 html.is-mobile .mw-parser-output ol {
-  padding-inline-start: 1.35rem;
+  padding-inline-start: 1.6rem;
 }
 
 html.is-mobile .mw-parser-output li + li {
-  margin-top: 0.3rem;
+  margin-top: 0.2rem;
 }
 
 html.is-mobile .mw-body a:not(.new) {
@@ -359,62 +355,50 @@ html.is-mobile .mw-body a:visited:not(.new) {
   color: var(--mobile-link-visited) !important;
 }
 
+html.is-mobile .mw-body a:active {
+  color: var(--mobile-link-active) !important;
+}
+
 html.is-mobile a:focus-visible,
 html.is-mobile button:focus-visible,
 html.is-mobile input:focus-visible,
 html.is-mobile summary:focus-visible {
-  outline: 3px solid var(--mobile-accent) !important;
+  outline: 2px solid var(--mobile-focus) !important;
   outline-offset: 2px;
 }
 
+html.is-mobile .hatnote,
 html.is-mobile blockquote {
-  margin: 1.25rem 0 !important;
-  padding: 0.25rem 0 0.25rem 1rem !important;
-  border-inline-start: 4px solid var(--mobile-accent) !important;
-  color: var(--mobile-text-muted) !important;
-}
-
-html.is-mobile pre,
-html.is-mobile code,
-html.is-mobile .mw-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  margin: 1rem 0 1.25rem !important;
+  padding: 0.65rem 0.8rem !important;
+  border: 0 !important;
+  border-inline-start: 3px solid var(--mobile-border) !important;
+  background: var(--mobile-background-subtle);
+  color: var(--mobile-color-subtle) !important;
+  font-size: 0.9375rem !important;
 }
 
 html.is-mobile pre,
 html.is-mobile .mw-code {
   max-width: 100%;
-  padding: 0.9rem !important;
+  padding: 0.75rem !important;
   overflow: auto;
-  border: 1px solid var(--mobile-border) !important;
-  border-radius: 8px;
-  background: var(--mobile-surface-muted) !important;
-  color: var(--mobile-text) !important;
-  font-size: 0.8125rem !important;
-  line-height: 1.5 !important;
+  border: 1px solid var(--mobile-border-subtle) !important;
+  background: var(--mobile-background-subtle) !important;
+  color: var(--mobile-color) !important;
+  font: 0.8125rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
 }
 
-/* Contents and article utility boxes. */
+/* Contents panel. */
 html.is-mobile .toc,
-html.is-mobile #toc,
-html.is-mobile .catlinks,
-html.is-mobile .navbox,
-html.is-mobile .vertical-navbox {
-  float: none !important;
+html.is-mobile #toc {
+  display: block !important;
   width: 100% !important;
-  max-width: 100% !important;
-  margin: 1.35rem 0 !important;
-  padding: 0.9rem 1rem !important;
-  overflow: hidden;
-  border: 1px solid var(--mobile-border) !important;
-  border-radius: var(--mobile-radius);
-  background: var(--mobile-surface-muted) !important;
-  color: var(--mobile-text) !important;
-}
-
-html.is-mobile .toc .toctitle,
-html.is-mobile #toc .toctitle {
-  margin-bottom: 0.4rem;
-  text-align: start;
+  margin: 1.25rem 0 !important;
+  padding: 0.75rem 0.9rem !important;
+  border: 1px solid var(--mobile-border-subtle) !important;
+  background: var(--mobile-background-subtle) !important;
+  color: var(--mobile-color) !important;
 }
 
 html.is-mobile .toc h2,
@@ -424,6 +408,7 @@ html.is-mobile #toc h2 {
   border: 0 !important;
   font-family: inherit;
   font-size: 1rem !important;
+  font-weight: 700;
 }
 
 html.is-mobile .toc ul,
@@ -435,16 +420,23 @@ html.is-mobile #toc ul {
 
 html.is-mobile .toc li,
 html.is-mobile #toc li {
-  margin: 0.35rem 0;
-  line-height: 1.4 !important;
+  margin: 0.25rem 0;
+  line-height: 1.45 !important;
 }
 
 html.is-mobile .tocnumber {
-  color: var(--mobile-text-muted) !important;
+  color: var(--mobile-color-subtle) !important;
   font-variant-numeric: tabular-nums;
 }
 
-/* Images become full-width reading cards instead of narrow desktop floats. */
+/* Thumbnails and media. */
+html.is-mobile img,
+html.is-mobile video,
+html.is-mobile svg {
+  max-width: 100%;
+  height: auto;
+}
+
 html.is-mobile .thumb,
 html.is-mobile .tright,
 html.is-mobile .tleft,
@@ -454,24 +446,16 @@ html.is-mobile .floatleft {
   clear: both !important;
   width: auto !important;
   max-width: 100% !important;
-  margin: 1.4rem auto !important;
+  margin: 1.25rem auto !important;
 }
 
 html.is-mobile .thumbinner {
-  width: 100% !important;
+  width: fit-content !important;
   max-width: 100% !important;
-  padding: 0.45rem !important;
-  overflow: hidden;
-  border: 1px solid var(--mobile-border) !important;
-  border-radius: var(--mobile-radius);
-  background: var(--mobile-surface-muted) !important;
-}
-
-html.is-mobile img,
-html.is-mobile video,
-html.is-mobile svg {
-  max-width: 100%;
-  height: auto;
+  margin: 0 auto;
+  padding: 0.25rem !important;
+  border: 1px solid var(--mobile-border-subtle) !important;
+  background: var(--mobile-background-subtle) !important;
 }
 
 html.is-mobile .thumb img,
@@ -483,116 +467,211 @@ html.is-mobile figure img {
   height: auto !important;
   margin: 0 auto;
   border: 0 !important;
-  border-radius: 8px;
 }
 
 html.is-mobile .thumbcaption,
 html.is-mobile figcaption {
-  padding: 0.65rem 0.35rem 0.25rem !important;
-  color: var(--mobile-text-muted) !important;
+  padding: 0.45rem 0.3rem 0.2rem !important;
+  color: var(--mobile-color-subtle) !important;
   font-size: 0.8125rem !important;
-  line-height: 1.45 !important;
+  line-height: 1.4 !important;
 }
 
-/* Infoboxes keep their table semantics but use the full reading column. */
+/*
+ * Infoboxes remain real tables. They fill the reading column, preserve
+ * authored section colors, and keep compact label/value rows like Minerva.
+ */
 html.is-mobile table.infobox,
 html.is-mobile table.infobox.vevent,
 html.is-mobile table.infobox-vevent {
+  display: table !important;
   float: none !important;
+  clear: both !important;
   width: 100% !important;
   max-width: 100% !important;
   margin: 1.5rem 0 !important;
-  border: 1px solid var(--mobile-border) !important;
-  border-collapse: separate !important;
-  border-spacing: 0;
-  border-radius: var(--mobile-radius);
-  background: var(--mobile-surface) !important;
-  color: var(--mobile-text) !important;
-  box-shadow: var(--mobile-shadow);
+  padding: 0 !important;
+  overflow: visible;
+  border: 1px solid var(--mobile-border-subtle) !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  background: var(--mobile-background-subtle);
+  color: var(--mobile-color) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.45 !important;
   table-layout: auto !important;
+}
+
+html.is-mobile table.infobox > tbody {
+  display: table-row-group !important;
+}
+
+html.is-mobile table.infobox > tbody > tr {
+  display: table-row !important;
 }
 
 html.is-mobile table.infobox th,
 html.is-mobile table.infobox td,
 html.is-mobile table.infobox-vevent th,
 html.is-mobile table.infobox-vevent td {
+  display: table-cell !important;
   width: auto !important;
-  max-width: 100% !important;
-  padding: 0.55rem 0.7rem !important;
-  border-color: var(--mobile-border) !important;
-  color: var(--mobile-text) !important;
+  max-width: none !important;
+  padding: 0.45rem 0.55rem !important;
+  vertical-align: top !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--mobile-border-subtle) !important;
+  color: var(--mobile-color) !important;
   font-size: 0.875rem !important;
   line-height: 1.45 !important;
   overflow-wrap: anywhere;
+  word-break: normal;
   white-space: normal !important;
+}
+
+html.is-mobile table.infobox th[scope="row"] {
+  width: 36% !important;
+  max-width: 36% !important;
+  font-weight: 700 !important;
+  text-align: start !important;
+}
+
+html.is-mobile table.infobox tr:last-child > th,
+html.is-mobile table.infobox tr:last-child > td {
+  border-bottom: 0 !important;
+}
+
+html.is-mobile table.infobox caption,
+html.is-mobile table.infobox .infobox-above,
+html.is-mobile table.infobox .infobox-title,
+html.is-mobile table.infobox .infobox-header,
+html.is-mobile table.infobox .infobox-subheader,
+html.is-mobile table.infobox .infobox-image,
+html.is-mobile table.infobox .infobox-full-data,
+html.is-mobile table.infobox .infobox-below {
+  width: auto !important;
+  max-width: 100% !important;
+  padding: 0.55rem !important;
+  color: var(--mobile-color) !important;
+  text-align: center !important;
 }
 
 html.is-mobile table.infobox caption,
 html.is-mobile table.infobox .infobox-above,
 html.is-mobile table.infobox .infobox-title {
-  padding: 0.75rem !important;
-  background: var(--mobile-surface-muted) !important;
-  color: var(--mobile-heading) !important;
-  font-size: 1.125rem !important;
-  font-weight: 700;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
   line-height: 1.3 !important;
-  text-align: center;
 }
 
 html.is-mobile table.infobox img,
 html.is-mobile table.infobox-vevent img {
   display: block;
   width: auto !important;
-  max-width: 100% !important;
+  max-width: min(100%, 22rem) !important;
   height: auto !important;
-  margin: 0.35rem auto !important;
-  border-radius: 8px;
+  margin: 0.25rem auto !important;
   object-fit: contain;
 }
 
-/* Wide article tables scroll without widening the page. */
-html.is-mobile .mw-parser-output > table:not(.infobox):not(.navbox):not(.vertical-navbox),
-html.is-mobile table.wikitable {
-  display: block !important;
-  width: 100% !important;
+html.is-mobile table.infobox table {
+  display: table !important;
+  width: auto !important;
   max-width: 100% !important;
-  margin: 1.25rem 0 !important;
-  overflow-x: auto;
-  border: 1px solid var(--mobile-border) !important;
-  border-radius: 8px;
-  border-collapse: separate !important;
-  border-spacing: 0;
-  background: var(--mobile-surface) !important;
-  color: var(--mobile-text) !important;
+  margin: 0 auto !important;
+  overflow: visible !important;
+  font-size: inherit !important;
+}
+
+/*
+ * Other tables follow Minerva's mobile behavior: keep their natural width,
+ * cap them at the viewport, and scroll only the table when it cannot wrap.
+ */
+html.is-mobile .mw-parser-output table:not(.infobox),
+html.is-mobile table.wikitable:not(.infobox),
+html.is-mobile table.navbox,
+html.is-mobile table.vertical-navbox {
+  display: block;
+  width: fit-content;
+  max-width: 100% !important;
+  margin: 1rem 0;
+  overflow: auto hidden;
+  border-collapse: collapse;
+  color: var(--mobile-color) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.45 !important;
   -webkit-overflow-scrolling: touch;
 }
 
-html.is-mobile table.wikitable th,
-html.is-mobile table.wikitable td {
-  min-width: 7rem;
-  padding: 0.55rem 0.7rem !important;
-  border-color: var(--mobile-border) !important;
-  color: var(--mobile-text) !important;
+html.is-mobile table.wikitable {
+  border: 0 !important;
+  background: var(--mobile-background) !important;
+}
+
+html.is-mobile .mw-parser-output caption {
+  display: block;
+  padding: 0.35rem 0;
+  color: var(--mobile-color) !important;
+  font-weight: 700;
+  text-align: start;
+}
+
+html.is-mobile table:not(.infobox) th,
+html.is-mobile table:not(.infobox) td {
+  max-width: min(30rem, 75vw);
+  padding: 0.35rem 0.45rem !important;
+  border-color: var(--mobile-border-subtle) !important;
+  color: var(--mobile-color) !important;
   font-size: 0.875rem !important;
-  line-height: 1.4 !important;
+  line-height: 1.45 !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal !important;
+}
+
+html.is-mobile table.infobox table th,
+html.is-mobile table.infobox table td {
+  max-width: none;
+  padding: 0.2rem 0.3rem !important;
+  font-size: inherit !important;
 }
 
 html.is-mobile table.wikitable th {
-  background: var(--mobile-surface-muted) !important;
-  color: var(--mobile-heading) !important;
+  background: var(--mobile-background-subtle) !important;
+  font-weight: 700;
+}
+
+html.is-mobile table.navbox,
+html.is-mobile table.vertical-navbox {
+  width: 100%;
+  border: 1px solid var(--mobile-border-subtle) !important;
+  background: var(--mobile-background-subtle) !important;
 }
 
 html.is-mobile .ambox,
 html.is-mobile .tmbox,
 html.is-mobile .ombox,
 html.is-mobile .cmbox,
-html.is-mobile .fmbox {
+html.is-mobile .fmbox,
+html.is-mobile .messagebox {
   width: 100% !important;
   max-width: 100% !important;
   margin: 1rem 0 !important;
-  border-color: var(--mobile-border) !important;
-  background: var(--mobile-surface-muted) !important;
-  color: var(--mobile-text) !important;
+  border-color: var(--mobile-border-subtle) !important;
+  background: var(--mobile-background-subtle) !important;
+  color: var(--mobile-color) !important;
+}
+
+html.is-mobile .catlinks {
+  width: 100%;
+  margin: 1.5rem 0 0 !important;
+  padding: 0.75rem !important;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--mobile-border-subtle) !important;
+  background: var(--mobile-background-subtle) !important;
+  color: var(--mobile-color) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.6 !important;
 }
 
 html.is-mobile .reflist,
@@ -601,93 +680,108 @@ html.is-mobile .references {
   line-height: 1.5 !important;
 }
 
-html.is-mobile #p-lang ul {
-  display: flex;
-  margin: 0;
-  padding: 0.35rem 0 0.65rem;
-  gap: 0.5rem;
-  overflow-x: auto;
-  list-style: none;
-  scrollbar-width: thin;
-}
-
-html.is-mobile #p-lang a {
-  display: inline-flex;
-  min-height: 2.4rem;
-  padding: 0.45rem 0.8rem;
-  align-items: center;
-  border: 1px solid var(--mobile-border);
-  border-radius: 999px;
-  background: var(--mobile-surface-muted);
-  color: var(--mobile-link) !important;
-  font-size: 0.875rem !important;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
+/* Compact footer: retain legal/edit information, remove duplicate site menus. */
 html.is-mobile #footer,
 html.is-mobile .mw-footer {
-  width: min(100%, 56rem) !important;
-  margin: 0 auto !important;
-  padding: 1.5rem 1rem 2rem !important;
-  border-top: 1px solid var(--mobile-border);
-  background: transparent !important;
-  color: var(--mobile-text-muted) !important;
-  font-size: 0.8125rem !important;
+  clear: both;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 1.25rem max(1rem, env(safe-area-inset-right)) calc(1.5rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)) !important;
+  overflow: hidden;
+  border-top: 1px solid var(--mobile-border-subtle);
+  background: var(--mobile-background-subtle) !important;
+  color: var(--mobile-color-subtle) !important;
+  font-size: 0.75rem !important;
   line-height: 1.5 !important;
-  text-align: center;
+  text-align: start;
 }
 
-html.is-mobile #footer ul,
-html.is-mobile .mw-footer ul {
-  margin: 0.35rem 0;
-  padding: 0;
+html.is-mobile #footer::before,
+html.is-mobile .mw-footer::before {
+  content: "Wikiless";
+  display: block;
+  width: min(100%, 50rem);
+  margin: 0 auto 0.65rem;
+  color: var(--mobile-color) !important;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+html.is-mobile #footer-info,
+html.is-mobile .mw-footer #footer-info {
+  width: min(100%, 50rem);
+  margin: 0 auto !important;
+  padding: 0 !important;
   list-style: none;
 }
 
-html.is-mobile #footer li,
-html.is-mobile .mw-footer li {
-  display: inline;
-  margin: 0 0.35rem;
+html.is-mobile #footer-info li,
+html.is-mobile .mw-footer #footer-info li {
+  display: block !important;
+  margin: 0.35rem 0 !important;
+  padding: 0 !important;
 }
 
-@media (min-width: 42rem) {
+html.is-mobile #footer-places,
+html.is-mobile #footer-icons,
+html.is-mobile .mw-footer #footer-places,
+html.is-mobile .mw-footer #footer-icons {
+  display: none !important;
+}
+
+html.is-mobile #footer a,
+html.is-mobile .mw-footer a {
+  color: var(--mobile-link) !important;
+}
+
+@media (max-width: 46rem) {
+  html.is-mobile .wikiless-mobile-wordmark,
+  html.is-mobile .wikiless-mobile-actions span {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+  }
+}
+
+@media (max-width: 25rem) {
+  html.is-mobile .wikiless-mobile-header {
+    grid-template-columns: auto minmax(6rem, 1fr) auto;
+    gap: 0.4rem;
+    padding-inline: 0.5rem;
+  }
+
+  html.is-mobile .wikiless-mobile-actions a {
+    min-width: 2.25rem;
+    padding-inline: 0.3rem;
+  }
+
   html.is-mobile #content,
   html.is-mobile .mw-body {
-    margin: 1.25rem auto !important;
-    border: 1px solid var(--mobile-border) !important;
-    border-radius: 16px;
-    box-shadow: var(--mobile-shadow);
-  }
-}
-
-@media (max-width: 31rem) {
-  html.is-mobile #mw-head {
-    flex-wrap: wrap;
-  }
-
-  html.is-mobile #right-navigation {
-    flex-basis: calc(100% - 7rem);
-  }
-
-  html.is-mobile #p-personal a {
-    min-height: 2.35rem;
-    padding-inline: 0.4rem;
-    font-size: 0.75rem !important;
+    padding-inline: 0.75rem !important;
   }
 
   html.is-mobile table.infobox th,
-  html.is-mobile table.infobox td,
-  html.is-mobile table.infobox-vevent th,
-  html.is-mobile table.infobox-vevent td {
-    padding: 0.45rem 0.5rem !important;
+  html.is-mobile table.infobox td {
+    padding: 0.4rem !important;
     font-size: 0.8125rem !important;
   }
 }
 
-@media (max-width: 23rem) {
-  html.is-mobile #mw-head::before {
-    display: none;
+@media (min-width: 50rem) {
+  html.is-mobile .wikiless-mobile-header {
+    grid-template-columns: minmax(9rem, 14rem) minmax(14rem, 30rem) auto;
+    justify-content: center;
+  }
+}
+
+@media print {
+  html.is-mobile .wikiless-mobile-header {
+    display: none !important;
   }
 }
 
