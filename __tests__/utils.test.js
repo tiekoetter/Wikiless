@@ -210,6 +210,25 @@ describe('Utils factory', () => {
     expect(result).toContain('href="/mobile.css"');
   });
 
+  test('applyUserMods() preserves existing html classes in the mobile variant', () => {
+    const html = '<html lang="en" class="client-nojs vector-feature-test"><head></head><body></body></html>';
+    const result = utils.applyUserMods(html, 'white', 'en', true);
+
+    expect(result).toContain('class="client-nojs vector-feature-test is-mobile"');
+    expect(result.match(/<html[^>]*\bclass=/g)).toHaveLength(1);
+  });
+
+  test.each([
+    [{ 'sec-ch-ua-mobile': '?1', 'user-agent': 'Mozilla/5.0 (X11; Linux x86_64)' }, true],
+    [{ 'sec-ch-ua-mobile': '?0', 'user-agent': 'Mozilla/5.0 (Linux; Android 16) Mobile' }, false],
+    [{ 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) Mobile Safari/604.1' }, true],
+    [{ 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Mobile/15E148 Safari/604.1' }, false],
+    [{ 'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) Firefox/143.0' }, false],
+    [{ 'x-wikiless-device': 'mobile', 'sec-ch-ua-mobile': '?0' }, true],
+  ])('isMobileRequest() honors browser and proxy device preferences %#', (headers, expected) => {
+    expect(utils.isMobileRequest({ headers })).toBe(expected);
+  });
+
   test('processHtml() strips scripts, iframes, and event handlers', async () => {
     const result = await utils.processHtml(
       {
@@ -610,7 +629,27 @@ describe('Utils factory', () => {
 
     expect(utils.download).toHaveBeenCalledWith('https://fr.wikipedia.org/wiki/Foo', 'oldid=1&useskin=vector');
     expect(utils.applyUserMods).toHaveBeenCalledWith('<html></html>', 'dark', 'fr', true);
+    expect(res.setHeader).toHaveBeenCalledWith('Accept-CH', 'Sec-CH-UA-Mobile');
+    expect(res.setHeader).toHaveBeenCalledWith('Vary', 'Sec-CH-UA-Mobile, User-Agent, X-Wikiless-Device, Cookie');
+    expect(res.setHeader).toHaveBeenCalledWith('X-Wikiless-Device', 'mobile');
+    expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'public, max-age=0, s-maxage=3600');
     expect(res.send).toHaveBeenCalledWith('MODDED');
+  });
+
+  test('handleWikiPage() does not share-cache preference override responses', async () => {
+    const req = {
+      query: { lang: 'en', theme: 'dark' },
+      cookies: { theme: 'dark' },
+      headers: { 'sec-ch-ua-mobile': '?0' },
+      params: { page: 'Foo' },
+    };
+    const res = createResponse();
+    utils.download = jest.fn(async () => ({ success: true, processed: true, html: '<html></html>' }));
+
+    await utils.handleWikiPage(req, res, '/wiki/');
+
+    expect(res.setHeader).toHaveBeenCalledWith('X-Wikiless-Device', 'desktop');
+    expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
   });
 
   test('handleWikiPage() processes uncached HTML before sending it', async () => {
