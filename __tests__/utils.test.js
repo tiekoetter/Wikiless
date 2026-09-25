@@ -295,8 +295,8 @@ describe('Utils factory', () => {
     );
 
     expect(result.success).toBe(true);
-    expect(result.html).toContain('<a href="/about">[ about ]</a>');
-    expect(result.html).toContain('<a href="/preferences?back=/wiki/Foo?oldid=1">[ preferences ]</a>');
+    expect(result.html).toContain('<a href="/about">About</a>');
+    expect(result.html).toContain('<a href="/preferences?back=/wiki/Foo?oldid=1">Preferences</a>');
     expect(result.html).toContain('<input type="hidden" name="_csrf" value="csrf-token">');
     expect(result.html).toContain('<input type="hidden" name="lang" value="en">');
     expect(result.html).not.toContain('p-wikibase-otherprojects');

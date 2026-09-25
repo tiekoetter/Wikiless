@@ -537,21 +537,28 @@ module.exports = function(redis, gotClient = null) {
 
   this.isMobileRequest = (req = {}) => {
     const headers = req.headers || {}
-    const firstHeader = (name) => {
-      const value = headers[name]
+    const header = (name) => {
+      const value = headers[name] ?? headers[name.toLowerCase()]
       return Array.isArray(value) ? value[0] : value
     }
 
-    const proxyDevice = String(firstHeader('x-wikiless-device') || '').trim().toLowerCase()
+    // A reverse proxy may normalize device detection to these two values.
+    const proxyDevice = String(header('x-wikiless-device') || '').trim().toLowerCase()
     if(proxyDevice === 'mobile') return true
     if(proxyDevice === 'desktop') return false
 
-    const mobileHint = String(firstHeader('sec-ch-ua-mobile') || '').trim()
+    // Chromium sends this low-entropy hint by default. Unlike a physical-device
+    // test, it reflects "Request desktop/mobile site" browser preferences.
+    const mobileHint = String(header('sec-ch-ua-mobile') || '').trim()
     if(mobileHint === '?1') return true
     if(mobileHint === '?0') return false
 
-    const ua = String(firstHeader('user-agent') || '')
+    const ua = String(header('user-agent') || '')
+
+    // Safari's desktop-site mode on iPad identifies itself as Macintosh while
+    // retaining a Mobile build token, so Macintosh must win over that token.
     if(/Macintosh/i.test(ua)) return false
+
     return /Android|iPhone|iPad|iPod|Mobile|Tablet|Windows Phone|webOS|BlackBerry/i.test(ua)
   }
 
@@ -560,6 +567,8 @@ module.exports = function(redis, gotClient = null) {
     res.setHeader('Vary', 'Sec-CH-UA-Mobile, User-Agent, X-Wikiless-Device, Cookie')
     res.setHeader('X-Wikiless-Device', isMobile ? 'mobile' : 'desktop')
 
+    // Preference query parameters also set cookies. Never let that transitional
+    // response enter a shared cache; the following cookie-only request can be.
     if(req.query && (req.query.theme !== undefined || req.query.default_lang !== undefined)) {
       res.setHeader('Cache-Control', 'private, no-store')
       return
@@ -584,10 +593,10 @@ module.exports = function(redis, gotClient = null) {
       if(nav) {
         nav.innerHTML = `
           <li>
-            <a href="/about">[ about ]</a>
+            <a href="/about">About</a>
           </li>
           <li>
-            <a href="/preferences?back=${url.split('wikipedia.org')[1]}">[ preferences ]</a>
+            <a href="/preferences?back=${url.split('wikipedia.org')[1]}">Preferences</a>
           </li>
 
         `
