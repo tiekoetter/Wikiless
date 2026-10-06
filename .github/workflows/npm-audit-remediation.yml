@@ -76,6 +76,8 @@ jobs:
           branch: automation/npm-audit-remediation
           delete-branch: true
           commit-message: 'fix(deps): remediate npm audit findings'
+          author: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          committer: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
           title: 'fix(deps): remediate npm audit findings'
           body: |
             `npm audit` found ${{ steps.report.outputs.before_total }} vulnerable package(s).
