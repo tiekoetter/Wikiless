@@ -226,7 +226,7 @@ describe('Utils factory', () => {
     expect(result).toContain('data-wikiless-theme="auto"');
     expect(result).toContain('href="/mobile.css?v=4"');
     expect(result).toContain('class="wikiless-mobile-header"');
-    expect(result).toContain('class="wikiless-mobile-mark" src="/static/images/project-logos/enwiki-2x.png"');
+    expect(result).toContain('class="wikiless-mobile-mark" src="/static/favicon/wikipedia.ico"');
     expect(result).toContain('class="wikiless-mobile-search"');
     expect(result).toContain('href="https://fr.wikipedia.org/wiki/Foo" aria-label="View on Wikipedia"');
     expect(result).toContain('href="/?lang=fr"');

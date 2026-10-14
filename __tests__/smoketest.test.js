@@ -22,6 +22,7 @@ describe('GET /health', () => {
 
   it('serves bundled Wikipedia skin and badge assets', async () => {
     const paths = [
+      '/static/favicon/wikipedia.ico',
       '/static/images/project-logos/enwiki-2x.png',
       '/static/images/mobile/copyright/wikipedia-wordmark-en.svg',
       '/w/skins/Vector/resources/common/images/external-link-ltr-icon.svg?48e54',

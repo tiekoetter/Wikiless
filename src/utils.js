@@ -537,7 +537,7 @@ module.exports = function(redis, gotClient = null) {
       const mobileHeader = `
         <header class="wikiless-mobile-header">
           <a class="wikiless-mobile-brand" href="/?lang=${encodedLang}" aria-label="Wikiless home">
-            <img class="wikiless-mobile-mark" src="/static/images/project-logos/enwiki-2x.png" alt="" width="32" height="37" aria-hidden="true">
+            <img class="wikiless-mobile-mark" src="/static/favicon/wikipedia.ico" alt="" width="32" height="32" aria-hidden="true">
             <span class="wikiless-mobile-wordmark">Wikiless</span>
           </a>
           <form class="wikiless-mobile-search" action="/w/index.php" method="get" role="search">
