@@ -67,6 +67,7 @@ jobs:
             .github/npm-audit-report.md
 
       - name: Open or update remediation pull request
+        if: steps.report.outputs.before_total != '0'
         uses: peter-evans/create-pull-request@v8
         with:
           add-paths: |
