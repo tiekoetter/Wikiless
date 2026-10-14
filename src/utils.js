@@ -8,7 +8,7 @@ module.exports = function(redis, gotClient = null) {
   const stream = require('stream')
   const { promisify } = require('util')
   const pipeline = promisify(stream.pipeline)
-  const mobileThemeVersion = '3'
+  const mobileThemeVersion = '4'
 
   let _got = gotClient;
   let proxyAgentsPromise = null;
@@ -446,6 +446,36 @@ module.exports = function(redis, gotClient = null) {
     }
   };
 
+  function wikipediaPageUrl(lang, rawPath = '/') {
+    const subdomain = this.mapToWikiSubdomain(lang)
+    const origin = `https://${subdomain}.wikipedia.org`
+    let target
+
+    try {
+      target = new URL(rawPath, origin)
+    } catch(err) {
+      target = new URL('/', origin)
+    }
+
+    // Always leave Wikiless for the selected Wikipedia language, and do not
+    // forward parameters that only have meaning on this frontend.
+    target.protocol = 'https:'
+    target.host = `${subdomain}.wikipedia.org`
+    for(const parameter of ['lang', 'theme', 'default_lang', 'useskin']) {
+      target.searchParams.delete(parameter)
+    }
+
+    return target.href
+  }
+
+  function escapeHtmlAttribute(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+  }
+
   this.applyUserMods = (data, theme, lang, isMobile=false, currentPath='/') => {
     /**
     * Apply user-specific modifications to the processed HTML.
@@ -503,10 +533,11 @@ module.exports = function(redis, gotClient = null) {
         : '/'
       const encodedLang = encodeURIComponent(lang)
       const preferencesUrl = `/preferences?back=${encodeURIComponent(safePath)}`
+      const wikipediaUrl = wikipediaPageUrl.call(this, lang, safePath)
       const mobileHeader = `
         <header class="wikiless-mobile-header">
           <a class="wikiless-mobile-brand" href="/?lang=${encodedLang}" aria-label="Wikiless home">
-            <span class="wikiless-mobile-mark" aria-hidden="true">W</span>
+            <img class="wikiless-mobile-mark" src="/static/images/project-logos/enwiki-2x.png" alt="" width="32" height="37" aria-hidden="true">
             <span class="wikiless-mobile-wordmark">Wikiless</span>
           </a>
           <form class="wikiless-mobile-search" action="/w/index.php" method="get" role="search">
@@ -518,6 +549,11 @@ module.exports = function(redis, gotClient = null) {
             </button>
           </form>
           <nav class="wikiless-mobile-actions" aria-label="Wikiless">
+            <a href="${escapeHtmlAttribute(wikipediaUrl)}" aria-label="View on Wikipedia">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11.7 2.5h5.8v5.8h-1.7V5.4l-6.2 6.2-1.2-1.2 6.2-6.2h-2.9V2.5ZM4.2 4.2h5V5.8H5.8v8.4h8.4v-3.4h1.6v5H4.2V4.2Z"/></svg>
+              <span class="wikiless-action-label-full">View on Wikipedia</span>
+              <span class="wikiless-action-label-short">Wikipedia</span>
+            </a>
             <a href="/about" aria-label="About Wikiless">
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.7a8.3 8.3 0 1 0 0 16.6 8.3 8.3 0 0 0 0-16.6Zm0 15A6.7 6.7 0 1 1 10 3.3a6.7 6.7 0 0 1 0 13.4ZM9.2 8.3h1.6v5H9.2v-5Zm0-2.5h1.6v1.7H9.2V5.8Z"/></svg>
               <span>About</span>
@@ -589,6 +625,8 @@ module.exports = function(redis, gotClient = null) {
       if(params) {
         url = `${url}?${params}`
       }
+      const wikipediaUrlPlaceholder = '__WIKILESS_VIEW_ON_WIKIPEDIA__'
+      const wikipediaUrl = wikipediaPageUrl.call(this, lang, url)
 
       data.html = parser.parse(data.html)
 
@@ -596,6 +634,9 @@ module.exports = function(redis, gotClient = null) {
       let nav = data.html.querySelector('nav#p-personal .vector-menu-content-list')
       if(nav) {
         nav.innerHTML = `
+          <li>
+            <a href="${wikipediaUrlPlaceholder}">View on Wikipedia</a>
+          </li>
           <li>
             <a href="/about">About</a>
           </li>
@@ -687,6 +728,7 @@ module.exports = function(redis, gotClient = null) {
       // replace wiki links
       const wiki_href_regx = /(href=\"(https:|http:|)\/\/([A-Za-z.-]+\.)?(wikipedia\.org|wikimedia\.org|wikidata\.org|mediawiki\.org))/gm
       data.html = data.html.replace(wiki_href_regx, 'href="')
+      data.html = data.html.replace(wikipediaUrlPlaceholder, escapeHtmlAttribute(wikipediaUrl))
 
       try {
         if(redis.isOpen === false) {

@@ -22,12 +22,15 @@ describe('GET /health', () => {
 
   it('serves bundled Wikipedia skin and badge assets', async () => {
     const paths = [
+      '/static/images/project-logos/enwiki-2x.png',
       '/static/images/mobile/copyright/wikipedia-wordmark-en.svg',
       '/w/skins/Vector/resources/common/images/external-link-ltr-icon.svg?48e54',
       '/w/extensions/WikimediaBadges/resources/images/badge-golden-star.png?ed948',
       '/w/extensions/WikimediaBadges/resources/images/badge-silver-star.png?70a8c',
       '/static/images/footer/wikimedia-button.svg',
+      '/static/images/footer/wikimedia.svg',
       '/w/resources/assets/poweredby_mediawiki.svg',
+      '/w/resources/assets/mediawiki_compact.svg',
     ];
 
     for(const assetPath of paths) {

@@ -224,9 +224,11 @@ describe('Utils factory', () => {
     expect(result).toContain('href="/styles_fr.css"');
     expect(result).toContain('class="is-mobile"');
     expect(result).toContain('data-wikiless-theme="auto"');
-    expect(result).toContain('href="/mobile.css?v=3"');
+    expect(result).toContain('href="/mobile.css?v=4"');
     expect(result).toContain('class="wikiless-mobile-header"');
+    expect(result).toContain('class="wikiless-mobile-mark" src="/static/images/project-logos/enwiki-2x.png"');
     expect(result).toContain('class="wikiless-mobile-search"');
+    expect(result).toContain('href="https://fr.wikipedia.org/wiki/Foo" aria-label="View on Wikipedia"');
     expect(result).toContain('href="/?lang=fr"');
     expect(result).toContain('href="/about"');
     expect(result).toContain('href="/preferences?back=%2Fwiki%2FFoo%3Flang%3Dfr"');
@@ -322,6 +324,7 @@ describe('Utils factory', () => {
     );
 
     expect(result.success).toBe(true);
+    expect(result.html).toContain('<a href="https://en.wikipedia.org/wiki/Foo?oldid=1">View on Wikipedia</a>');
     expect(result.html).toContain('<a href="/about">About</a>');
     expect(result.html).toContain('<a href="/preferences?back=/wiki/Foo?oldid=1">Preferences</a>');
     expect(result.html).toContain('<input type="hidden" name="_csrf" value="csrf-token">');

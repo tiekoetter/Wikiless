@@ -141,18 +141,11 @@ html.is-mobile .wikiless-mobile-brand {
 }
 
 html.is-mobile .wikiless-mobile-mark {
-  display: grid;
+  display: block;
   flex: 0 0 2rem;
   width: 2rem;
   height: 2rem;
-  place-items: center;
-  border: 1px solid var(--mobile-border-subtle);
-  border-radius: 2px;
-  background: var(--mobile-background);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.45rem;
-  font-weight: 700;
-  line-height: 1;
+  object-fit: contain;
 }
 
 html.is-mobile .wikiless-mobile-wordmark {
@@ -247,6 +240,14 @@ html.is-mobile .wikiless-mobile-actions a {
 
 html.is-mobile .wikiless-mobile-actions a:hover {
   background: var(--mobile-background-subtle);
+}
+
+html.is-mobile .wikiless-action-label-full {
+  display: none;
+}
+
+html.is-mobile .wikiless-action-label-short {
+  display: inline;
 }
 
 /* Article column and typography. */
@@ -599,7 +600,7 @@ html.is-mobile table.wikitable:not(.infobox),
 html.is-mobile table.navbox,
 html.is-mobile table.vertical-navbox {
   display: block;
-  width: fit-content;
+  width: 100%;
   max-width: 100% !important;
   margin: 1rem 0;
   overflow: auto hidden;
@@ -631,7 +632,7 @@ html.is-mobile table:not(.infobox) td {
   color: var(--mobile-color) !important;
   font-size: 0.875rem !important;
   line-height: 1.45 !important;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   word-break: normal;
   white-space: normal !important;
 }
@@ -714,18 +715,6 @@ html.is-mobile .mw-footer {
   font-size: 0.8125rem !important;
   line-height: 1.5 !important;
   text-align: start;
-}
-
-html.is-mobile #footer::before,
-html.is-mobile .mw-footer::before {
-  content: "Wikiless";
-  display: block;
-  width: min(100%, 50rem);
-  margin: 0 auto 0.65rem;
-  color: var(--mobile-color) !important;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1rem;
-  font-weight: 700;
 }
 
 html.is-mobile #footer-info,
@@ -821,7 +810,6 @@ html.is-mobile .mw-footer a {
     flex-basis: 1.75rem;
     width: 1.75rem;
     height: 1.75rem;
-    font-size: 1.25rem;
   }
 
   html.is-mobile .wikiless-mobile-wordmark {
@@ -853,6 +841,14 @@ html.is-mobile .mw-footer a {
 }
 
 @media (min-width: 50rem) {
+  html.is-mobile .wikiless-action-label-full {
+    display: inline;
+  }
+
+  html.is-mobile .wikiless-action-label-short {
+    display: none;
+  }
+
   html.is-mobile .wikiless-mobile-header {
     grid-template:
       "brand search actions" 2.75rem /
