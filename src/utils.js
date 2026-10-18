@@ -9,6 +9,7 @@ module.exports = function(redis, gotClient = null) {
   const { promisify } = require('util')
   const pipeline = promisify(stream.pipeline)
   const mobileThemeVersion = '4'
+  const wikipediaPageCacheVersion = '2'
 
   let _got = gotClient;
   let proxyAgentsPromise = null;
@@ -297,6 +298,10 @@ module.exports = function(redis, gotClient = null) {
     return lang
   }
 
+  function wikipediaPageCacheKey(url) {
+    return `wikiless:page:v${wikipediaPageCacheVersion}:${url}`
+  }
+
   function encodeMediaPathSegment(decoded) {
     return encodeURIComponent(decoded)
   }
@@ -383,15 +388,16 @@ module.exports = function(redis, gotClient = null) {
     }
     u.searchParams.set('useskin', 'vector');
     url = `https://${downloadLang}.wikipedia.org${u.pathname}${u.search}`;
+    const cacheKey = wikipediaPageCacheKey(url)
   
     const UA = config.wikimedia_useragent;
   
     try {
       if (!redis.isOpen) await redis.connect();
-      const cached = await redis.get(url);
+      const cached = await redis.get(cacheKey);
       if (cached) {
         console.log('Got key %s from cache.', url);
-        return { success: true, html: cached, processed: true, url };
+        return { success: true, html: cached, processed: true, url, cacheKey };
       }
     } catch (err) {
       console.error('Redis GET error for %s:', url, err);
@@ -415,7 +421,7 @@ module.exports = function(redis, gotClient = null) {
         retry: { limit: 0 }
       }));
       console.log('Fetched %s from Wikipedia.', url);
-      return { success: true, html: body, processed: false, url };
+      return { success: true, html: body, processed: false, url, cacheKey };
     } catch (err) {
       const status = err.response?.statusCode ?? 'NO_RESPONSE';
       const retryAfterHeader = err.response?.headers?.['retry-after']
@@ -474,6 +480,43 @@ module.exports = function(redis, gotClient = null) {
       .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
+  }
+
+  function localWikipediaHref(rawHref, currentLang) {
+    if(typeof rawHref !== 'string' || !rawHref) {
+      return null
+    }
+
+    const wikipediaSuffix = '.wikipedia.org'
+    const currentSubdomain = this.mapToWikiSubdomain(currentLang)
+    const currentOrigin = `https://${currentSubdomain}.wikipedia.org`
+    let target
+    let linkLang = currentLang
+
+    try {
+      target = new URL(rawHref, currentOrigin)
+    } catch(err) {
+      return null
+    }
+
+    if(!target.hostname.endsWith(wikipediaSuffix)) {
+      return null
+    }
+
+    const targetSubdomain = target.hostname.slice(0, -wikipediaSuffix.length)
+    if(targetSubdomain !== currentSubdomain) {
+      if(!this.validLang(targetSubdomain)) {
+        return null
+      }
+      linkLang = targetSubdomain
+    }
+
+    if(!target.pathname.startsWith('/wiki/') && !target.pathname.startsWith('/w/')) {
+      return null
+    }
+
+    target.searchParams.set('lang', linkLang)
+    return `${target.pathname}${target.search}${target.hash}`
   }
 
   this.applyUserMods = (data, theme, lang, isMobile=false, currentPath='/') => {
@@ -647,16 +690,15 @@ module.exports = function(redis, gotClient = null) {
         `
       }
 
-      // append the lang query param to the URLs starting with /wiki/ or /w/
-      let links = data.html.querySelectorAll('a')
+      // Keep Wikipedia navigation on Wikiless and preserve the selected
+      // language. Wikipedia may emit either root-relative links or absolute
+      // links to the current language subdomain.
+      let links = data.html.querySelectorAll('a, area')
       for(let i = 0; i < links.length; i++) {
         let href = links[i].getAttribute('href')
-        if(href && (href.startsWith('/wiki/') || href.startsWith('/w/'))) {
-          href = `${protocol}${config.domain}${href}`
-          let u = new URL(href)
-          u.searchParams.append('lang', lang)
-          href = `${u.pathname}${u.search}`
-          links[i].setAttribute('href', href)
+        const localHref = localWikipediaHref.call(this, href, lang)
+        if(localHref) {
+          links[i].setAttribute('href', localHref)
         }
       }
 
@@ -694,20 +736,6 @@ module.exports = function(redis, gotClient = null) {
         }
       }
 
-      /**
-      * Process language links in the sidebar:
-      * - Remove language subdomains.
-      * - Append language as a query parameter.
-      */
-      let lang_links = data.html.querySelectorAll('#p-lang .interlanguage-link a')
-      for(let i = 0; i < lang_links.length; i++) {
-        let href = lang_links[i].getAttribute('href')
-        let lang_code = href.split('wikipedia.org')[0].split('//')[1]
-        href = href.replace(lang_code, '')
-        href = `${href}?lang=${lang_code.slice(0, -1)}`
-        lang_links[i].setAttribute('href', href)
-      }
-
       data.html = data.html.toString()
       // replace upload.wikimedia.org with /media
       const upload_wikimedia_regx = /((https:|http:|)\/\/?upload\.wikimedia\.org)/gm
@@ -734,7 +762,7 @@ module.exports = function(redis, gotClient = null) {
         if(redis.isOpen === false) {
           await redis.connect()
         }
-        await redis.setEx(data.url, config.setexs.wikipage, data.html)
+        await redis.setEx(data.cacheKey || data.url, config.setexs.wikipage, data.html)
         return { success: true, html: data.html }
       } catch(error) {
         console.log(`Error setting the ${url} key to Redis. Error: ${error}`)
@@ -984,6 +1012,9 @@ module.exports = function(redis, gotClient = null) {
 
         if(prefix) {
           let redirect_to = `${prefix}${result.url.split(prefix)[1]}`
+          const redirectUrl = new URL(redirect_to, 'https://wikiless.local')
+          redirectUrl.searchParams.set('lang', lang)
+          redirect_to = `${redirectUrl.pathname}${redirectUrl.search}${redirectUrl.hash}`
           return res.redirect(redirect_to)
         }
         return res.redirect(`/?lang=${lang}`)

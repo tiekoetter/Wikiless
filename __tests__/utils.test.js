@@ -119,6 +119,23 @@ describe('Utils factory', () => {
     );
   });
 
+  test('download() uses a versioned processed-page cache key', async () => {
+    fakeRedis.get.mockResolvedValueOnce('<html>cached</html>');
+    const gotClient = jest.fn();
+    utils = new Utils(fakeRedis, gotClient);
+
+    const result = await utils.download('https://de.wikipedia.org/wiki/Foo');
+
+    const cacheKey = 'wikiless:page:v2:https://de.wikipedia.org/wiki/Foo?useskin=vector';
+    expect(fakeRedis.get).toHaveBeenCalledWith(cacheKey);
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      processed: true,
+      cacheKey,
+    }));
+    expect(gotClient).not.toHaveBeenCalled();
+  });
+
   test('download() does not retry upstream requests independently', async () => {
     const gotClient = jest.fn(async () => ({ body: '<html></html>' }));
     utils = new Utils(fakeRedis, gotClient);
@@ -309,6 +326,8 @@ describe('Utils factory', () => {
           '<form action="/w/index.php"></form>',
           '<div id="p-wikibase-otherprojects"></div>',
           '<div id="p-lang"><span class="interlanguage-link"><a href="https://fr.wikipedia.org/wiki/Foo">French</a></span></div>',
+          '<a href="https://en.wikipedia.org/wiki/Bar?oldid=2#History">Bar</a>',
+          '<map><area href="https://en.wikipedia.org/wiki/Baz"></map>',
           '<img src="//upload.wikimedia.org/wikipedia/commons/Foo.png">',
           '<img src="https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Foo.svg/40px-Foo.svg.png?utm_source=en.wikipedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail">',
           '<img src="https://maps.wikimedia.org/map.png">',
@@ -331,6 +350,8 @@ describe('Utils factory', () => {
     expect(result.html).toContain('<input type="hidden" name="lang" value="en">');
     expect(result.html).not.toContain('p-wikibase-otherprojects');
     expect(result.html).toContain('href="/wiki/Foo?lang=fr"');
+    expect(result.html).toContain('href="/wiki/Bar?oldid=2&lang=en#History"');
+    expect(result.html).toContain('href="/wiki/Baz?lang=en"');
     expect(result.html).toContain('src="/media/wikipedia/commons/Foo.png"');
     expect(result.html).toContain('src="/media/thumb_wikimedia_org/wikipedia/commons/thumb/8/87/Foo.svg/40px-Foo.svg.png?utm_source=en.wikipedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail"');
     expect(result.html).toContain('src="/media/maps_wikimedia_org/map.png"');
@@ -741,7 +762,7 @@ describe('Utils factory', () => {
 
     await utils.handleWikiPage(req, res, '/wiki/');
 
-    expect(res.redirect).toHaveBeenCalledWith('/wiki/Bar');
+    expect(res.redirect).toHaveBeenCalledWith('/wiki/Bar?lang=de');
   });
 
   test('handleWikiPage() preserves upstream failures instead of reporting invalid HTML', async () => {
