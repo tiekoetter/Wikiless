@@ -1047,31 +1047,24 @@ module.exports = function(redis, gotClient = null) {
 
   this.mapToWikiSubdomain = (lang) => {
     if(!lang) return config.default_lang
-    const l = String(lang).toLowerCase()
-    const map = {
-      'zh-min-nan': 'nan',
-      'zh-yue': 'yue',
-      'zh-classical': 'lzh'
-    }
-    if(map[l]) return map[l]
-    return l.split('-')[0]
+    return String(lang).toLowerCase()
   }
 
   this.validLang = (lang, return_langs=false) => {
     // Comprehensive list of Wikimedia-supported language codes including variants.
     const valid_langs = [
-      'aa','ab','ace','ady','af','ak','als','am','an','ang','ar','arc','arn','aro','ary','arz','as','ast','atj','av','avk','awa','ay','az','azb',
-      'ba','bar','bat-smg','bcl','be','be-tarask','bg','bho','bi','bjn','bm','bn','bo','bpy','br','bs','bug','bxr','ca','cbk-zam','cdo','ce','ceb',
-      'ch','chr','ckb','co','cr','crh','cs','csb','cu','cv','cy','da','de','din','diq','dsb','dty','dv','dz','ee','el','eml','en','eo','es','et','eu',
-      'ext','fa','ff','fi','fiu-vro','fj','fo','fr','frp','frr','fur','fy','ga','gag','gan','gcr','gd','gl','glk','gn','gom','gor','got','gu','gv',
-      'ha','hak','haw','he','hi','hif','hr','hsb','ht','hu','hy','hyw','ia','id','ie','ig','ik','ilo','inh','io','is','it','iu','ja','jam','jbo','jv',
-      'ka','kaa','kab','kbd','kbp','kg','ki','kk','kl','km','kn','ko','koi','krc','ks','ksh','ku','kv','kw','ky','la','lad','lb','lbe','lez','lfn','lg',
-      'li','lij','lld','lmo','ln','lo','lt','ltg','lv','map-bms','mai','mg','mhr','mi','min','mk','ml','mn','mnw','mr','mrj','ms','mt','mwl','my','myv','mzn',
-      'na','nah','nap','nds','nds-nl','ne','new','ng','nl','nn','no','nov','nqo','nrm','nso','nv','ny','oc','olo','om','or','os','pa','pag','pam','pap',
-      'pcd','pdc','pfl','pi','pih','pl','pms','pnb','pnt','ps','pt','qu','rm','rmy','rn','ro','roa-rup','roa-tara','ru','rue','rw','sa','sah','sc','scn','sco',
-      'sd','se','sg','sh','shn','si','simple','sk','skr','sl','sm','smn','sn','so','sq','sr','srn','ss','st','stq','su','sv','sw','szl','szy','ta','tcy','te',
-      'tet','tg','th','ti','tk','tl','tn','to','tpi','tr','ts','tt','tum','tw','ty','tyv','udm','ug','uk','ur','uz','ve','vec','vep','vi','vls','vo','wa',
-      'war','wo','wuu','xal','xh','xmf','yi','yo','za','zea','zh','zh-classical','zh-min-nan','zh-yue','zu',]
+      'aa','ab','ace','ady','af','ak','als','alt','am','ami','an','ang','ann','anp','ar','arc','arn','aro','ary','arz','as','ast','atj','av','avk','awa','ay','az','azb',
+      'ba','ban','bar','bat-smg','bbc','bcl','bdr','be','be-tarask','bew','bg','bh','bho','bi','bjn','blk','bm','bn','bo','bol','bpy','br','bs','btm','bug','bxr','ca','cbk-zam','cdo','ce','ceb',
+      'ch','chr','chy','ckb','co','cr','crh','cs','csb','cu','cv','cy','da','dag','de','dga','din','diq','dsb','dtp','dty','dv','dz','ee','el','eml','en','eo','es','et','eu',
+      'ext','fa','fat','ff','fi','fiu-vro','fj','fo','fon','fr','frp','frr','fur','fy','ga','gag','gan','gcr','gd','gl','glk','gn','gom','gor','got','gpe','gu','guc','gur','guw','gv',
+      'ha','hak','haw','he','hi','hif','hr','hsb','ht','hu','hy','hyw','ia','iba','id','ie','ig','igl','ik','ilo','inh','io','is','isv','it','iu','ja','jam','jbo','jv',
+      'ka','kaa','kab','kai','kaj','kbd','kbp','kcg','kg','kge','ki','kk','kl','km','kn','knc','ko','koi','krc','ks','ksh','ku','kus','kv','kw','ky','la','lad','lb','lbe','lez','lfn','lg',
+      'li','lij','lld','lmo','ln','lo','lt','ltg','lv','mad','mag','mai','map-bms','mdf','mg','mhr','mi','min','mk','ml','mn','mni','mnw','mos','mr','mrj','ms','mt','mwl','my','myv','mzn',
+      'na','nah','nap','nds','nds-nl','ne','new','ng','nia','nl','nn','no','nov','nqo','nr','nrm','nso','nup','nv','ny','oc','olo','om','or','os','pa','pag','pam','pap',
+      'pcd','pcm','pdc','pfl','pi','pih','pl','pms','pnb','pnt','ppl','ps','pt','pwn','qu','rki','rm','rmy','rn','ro','roa-rup','roa-tara','rsk','ru','rue','rw','sa','sah','sat','sc','scn','sco',
+      'sd','se','sg','sh','shi','shn','si','simple','sk','skr','sl','sm','smn','sn','so','sq','sr','srn','ss','st','stq','su','sv','sw','syl','szl','szy','ta','tay','tcy','tdd','te',
+      'tet','tg','th','ti','tig','tk','tl','tly','tn','to','tok','tpi','tr','trv','ts','tt','tum','tw','ty','tyv','udm','ug','uk','ur','uz','ve','vec','vep','vi','vls','vo','wa',
+      'war','wo','wuu','xal','xh','xmf','yi','yo','za','zea','zgh','zh','zh-classical','zh-min-nan','zh-yue','zu',]
 
     if(return_langs) {
       return valid_langs
