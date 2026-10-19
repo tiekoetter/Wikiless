@@ -198,12 +198,19 @@ describe('Utils factory', () => {
     expect(Array.isArray(utils.validLang('', true))).toBe(true);
   });
 
-  test('mapToWikiSubdomain() handles Wikimedia language variants', () => {
+  test('mapToWikiSubdomain() preserves Wikimedia edition subdomains', () => {
     expect(utils.mapToWikiSubdomain()).toBe('en');
-    expect(utils.mapToWikiSubdomain('zh-min-nan')).toBe('nan');
-    expect(utils.mapToWikiSubdomain('zh-yue')).toBe('yue');
-    expect(utils.mapToWikiSubdomain('zh-classical')).toBe('lzh');
-    expect(utils.mapToWikiSubdomain('pt-br')).toBe('pt');
+    expect(utils.mapToWikiSubdomain('ZH-MIN-NAN')).toBe('zh-min-nan');
+    expect(utils.mapToWikiSubdomain('bat-smg')).toBe('bat-smg');
+    expect(utils.mapToWikiSubdomain('cbk-zam')).toBe('cbk-zam');
+  });
+
+  test.each([
+    'alt','ami','ann','anp','ban','bbc','bdr','bew','bh','blk','bol','btm','chy','dag','dga','dtp','fat','fon',
+    'gpe','guc','gur','guw','iba','igl','isv','kai','kaj','kcg','kge','knc','kus','mad','mag','mdf','mni','mos',
+    'nia','nr','nup','pcm','ppl','pwn','rki','rsk','sat','shi','syl','tay','tdd','tig','tly','tok','trv','zgh',
+  ])('validLang() accepts current Wikipedia edition %s', (lang) => {
+    expect(utils.validLang(lang)).toBe(true);
   });
 
   test('wikilessLogo() & wikilessFavicon() point into static/', () => {
