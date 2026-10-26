@@ -6,7 +6,7 @@ This file is maintained by the [npm audit remediation workflow](workflows/npm-au
 
 ## Result
 
-- Vulnerable packages before remediation: **0**
+- Vulnerable packages before remediation: **1**
 - Vulnerable packages after remediation: **0**
 - Safe `npm audit fix` outcome: **success**
 - Clean install outcome: **success**
@@ -20,4 +20,6 @@ _None._
 
 ## Findings detected before remediation
 
-_None._
+Package | Severity | Dependency | Advisory | npm fix
+--- | --- | --- | --- | ---
+body-parser | high | Direct | [body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body](https://github.com/advisories/GHSA-27r3-jxmh-p828) | Available
