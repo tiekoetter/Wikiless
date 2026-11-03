@@ -105,16 +105,18 @@ const reviewNotice = manualReview
   ? '> **Manual review required.** One or more findings remain, the safe fix failed, or validation did not pass.'
   : '> No findings remain and the resulting dependency tree passed validation.';
 
-const report = `# npm audit remediation report
+const report = `# npm production dependency audit remediation report
 
 This file is maintained by the [npm audit remediation workflow](workflows/npm-audit-remediation.yml).
+
+The workflow audits production dependencies with \`npm audit --omit=dev\`. Development-only packages are excluded because they are not installed in the runtime image.
 
 ${reviewNotice}
 
 ## Result
 
-- Vulnerable packages before remediation: **${beforeTotal}**
-- Vulnerable packages after remediation: **${afterTotal}**
+- Vulnerable production packages before remediation: **${beforeTotal}**
+- Vulnerable production packages after remediation: **${afterTotal}**
 - Safe \`npm audit fix\` outcome: **${auditFixOutcome}**
 - Clean install outcome: **${installOutcome}**
 - Test outcome: **${testOutcome}**
